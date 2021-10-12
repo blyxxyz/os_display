@@ -19,7 +19,7 @@ use common::Shell;
 // ksh-compatible shells
 static BASH: Lazy<Shell> = Lazy::new(|| Shell::new(&mut Command::new("bash")));
 static ZSH: Lazy<Shell> = Lazy::new(|| Shell::new(&mut Command::new("zsh")));
-static KSH: Lazy<Shell> = Lazy::new(|| Shell::new(&mut Command::new("ksh93")));
+static KSH: Lazy<Shell> = Lazy::new(|| Shell::new(&mut Command::new("ksh")));
 static MKSH: Lazy<Shell> = Lazy::new(|| Shell::new(&mut Command::new("mksh")));
 static BUSYBOX: Lazy<Shell> = Lazy::new(|| Shell::new(Command::new("busybox").arg("sh")));
 
