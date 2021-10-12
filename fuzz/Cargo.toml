@@ -31,3 +31,9 @@ name = "shell"
 path = "fuzz_targets/shell.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "powershell"
+path = "fuzz_targets/powershell.rs"
+test = false
+doc = false

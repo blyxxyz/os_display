@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ master ]
+
+jobs:
+  test:
+    name: Test
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - run: rustup toolchain add 1.31 1.36 stable nightly
+      - run: cargo +1.31 check --no-default-features
+      - run: cargo +1.31 test
+      - run: cargo +1.36 check --no-default-features --features alloc
+      - run: cargo +1.36 test
+      - run: cargo +stable test
+      - run: cargo +nightly test
+
+  test_wasm:
+    name: Test (WASM)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: rustup toolchain add 1.31
+      - run: rustup target add wasm32-unknown-unknown --toolchain 1.31
+      - run: node test_wasm.js
+
+  fuzz:
+    name: Fuzz
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y bash zsh ksh mksh busybox dash posh yash fish tcsh curl liblttng-ust0
+      - run: curl -L -o powershell.deb https://github.com/PowerShell/PowerShell/releases/download/v7.1.4/powershell_7.1.4-1.ubuntu.20.04_amd64.deb
+      - run: sudo dpkg -i powershell.deb
+      - run: rustup toolchain add nightly
+      - run: cargo install cargo-fuzz
+      # This is too short to catch subtle issues, but it hopefully catches glaring ones.
+      - run: cargo +nightly fuzz run basic -- -max_len=32 -timeout=1 -max_total_time=60
+      - run: cargo +nightly fuzz run shell -- -max_len=32 -timeout=1 -max_total_time=180
+      - run: cargo +nightly fuzz run powershell -- -max_len=32 -timeout=1 -max_total_time=180
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: rustup target add x86_64-pc-windows-msvc wasm32-wasi wasm32-unknown-unknown
+
+      - name: rustfmt
+        run: cargo fmt -- --check
+
+      - name: clippy (Linux)
+        run: cargo clippy -- -D warnings
+
+      - name: clippy (Windows)
+        run: cargo clippy --target x86_64-pc-windows-msvc -- -D warnings
+
+      - name: clippy (WASI)
+        run: cargo clippy --target wasm32-wasi -- -D warnings
+
+      - name: clippy (WASM)
+        run: cargo clippy --target wasm32-unknown-unknown -- -D warnings

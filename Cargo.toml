@@ -2,17 +2,20 @@
 name = "os_display"
 version = "0.1.0"
 authors = ["Jan Verbeek <jan.verbeek@posteo.nl>"]
+description = "Display strings in a safe platform-appropriate way"
+keywords = ["shell", "cli", "terminal", "text", "no_std"]
+categories = ["command-line-interface", "text-processing"]
+repository = "https://github.com/blyxxyz/os_display"
+documentation = "https://docs.rs/os_display"
 license = "MIT"
 readme = "README.md"
-exclude = ["fuzz", "benches", ".gitignore"]
 edition = "2018"
+exclude = ["fuzz", ".gitignore", ".github", "test_wasm.js"]
 
 [dependencies]
 unicode-width = "0.1.9"
 
-[dev-dependencies]
-criterion = "0.3.5"
-
-[[bench]]
-name = "benchmark"
-harness = false
+[features]
+default = ["alloc", "std"]
+alloc = []
+std = ["alloc"]

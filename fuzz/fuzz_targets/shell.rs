@@ -2,69 +2,19 @@
 use libfuzzer_sys::fuzz_target;
 
 use std::ffi::OsStr;
-use std::io::{Read, Write};
 use std::os::unix::ffi::OsStrExt;
-use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
+use std::process::Command;
 
 use once_cell::sync::Lazy;
 
 use os_display::Quotable;
 
-struct Shell(Mutex<Child>);
+mod common;
 
-impl Shell {
-    fn new(cmd: &mut Command) -> Self {
-        Shell(Mutex::new(
-            cmd.stdin(Stdio::piped())
-                .stdout(Stdio::piped())
-                .spawn()
-                .unwrap(),
-        ))
-    }
+use common::Shell;
 
-    fn send(&self, input: impl std::fmt::Display) -> Vec<u8> {
-        let mut child = self.0.lock().unwrap();
-        // \0 as an unambiguous separator, \n in case there's line buffering
-        write!(
-            child.stdin.as_mut().unwrap(),
-            "printf '%s\\0\\n' {} || exit 1;\n",
-            input
-        )
-        .unwrap();
-        let mut output = Vec::new();
-        let mut pos = 0;
-        fn read_uninterrupted(child: &mut Child, buf: &mut [u8]) -> usize {
-            let stdout = child.stdout.as_mut().unwrap();
-            loop {
-                match stdout.read(buf) {
-                    Ok(0) => panic!("empty read"),
-                    Ok(n) => return n,
-                    Err(err) if err.kind() == std::io::ErrorKind::Interrupted => continue,
-                    Err(err) => panic!("{:?}", err),
-                }
-            }
-        }
-        loop {
-            output.resize(pos + 8192, 0);
-            pos += read_uninterrupted(&mut child, &mut output[pos..]);
-            output.truncate(pos);
-            if output.contains(&0) {
-                if output.last().unwrap() == &0 {
-                    output.push(0);
-                    assert_eq!(read_uninterrupted(&mut child, &mut output[pos..]), 1);
-                }
-                assert!(output.ends_with(&[b'\0', b'\n']));
-                output.pop();
-                output.pop();
-                return output;
-            }
-        }
-    }
-}
-
-// All these are packaged on Debian.
-// apt install bash zsh ksh mksh busybox dash posh yash fish csh tcsh
+// All these are packaged on Debian:
+// apt install bash zsh ksh mksh busybox dash posh yash fish tcsh
 
 // ksh-compatible shells
 static BASH: Lazy<Shell> = Lazy::new(|| Shell::new(&mut Command::new("bash")));
@@ -135,7 +85,7 @@ fuzz_target!(|data: &[u8]| {
         // wontfix: https://github.com/fish-shell/fish-shell/issues/8316
         if !quote
             .chars()
-            .any(|ch| (ch as u32) >= 0xF600 && (ch as u32) <= 0xF6FF)
+            .any(|ch| ('\u{F600}'..='\u{F6FF}').contains(&ch))
         {
             assert_eq!(FISH.send(&quote), data, "{:?}", text);
             assert_eq!(FISH.send(&maybe_quote), data, "{:?}", text);

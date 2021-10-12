@@ -1,10 +1,15 @@
 # `os_display`
 
-Printing filenames can be tricky. They may contain special characters that mess up the message or even the whole terminal. They may not be safe to use in a command without quoting or escaping. They may also contain invalid unicode.
+[![Crates.io](https://img.shields.io/crates/v/os_display.svg)](https://crates.io/crates/os_display)
+[![API reference](https://docs.rs/os_display/badge.svg)](https://docs.rs/os_display/)
+[![MSRV](https://img.shields.io/badge/MSRV-1.31-blue)](https://blog.rust-lang.org/2018/12/06/Rust-1.31-and-rust-2018.html)
+[![CI](https://img.shields.io/github/workflow/status/blyxxyz/os_display/CI/master)](https://github.com/blyxxyz/os_display/actions)
+
+Printing filenames can be tricky. They may contain control codes that mess up the message or even the whole terminal. They may not be safe to use in a command without quoting or escaping. They may also contain invalid unicode.
 
 This library lets you add quoting to filenames (and other strings) to display them more safely and usefully. The goal is to render them in such a way that they can always be copied and pasted back into a shell without information loss.
 
-On Unix values are quoted using bash/ksh syntax, while on Windows PowerShell syntax is used. (Other platforms use a generic fallback.)
+On Unix values are quoted using bash/ksh syntax, while on Windows PowerShell syntax is used. Other platforms currently default to the Unix style.
 
 ## When should I use this?
 
@@ -23,7 +28,7 @@ Import the `Quotable` trait:
 use os_display::Quotable;
 ```
 
-This adds two methods to most string types: `.quote()` and `.maybe_quote()`. They return thin wrappers with a custom `Display` implementation (and so do not allocate).
+This adds two methods to the common string types (including `OsStr`): `.quote()` and `.maybe_quote()`. They return `Quoted`, a wrapper with a custom `Display` implementation.
 
 `.quote()` always puts quotes around the text:
 
@@ -53,6 +58,12 @@ println!("{}: Not found", "*?$".maybe_quote());
 ```
 
 `.quote()` is best used inside longer sentences while `.maybe_quote()` can be used for text that's already separated some other way (like by a colon).
+
+## Limitations
+- Unicode may be quoted but is not escaped. The printed text can still look weird, and a few (buggy) terminals may drop certain characters.
+- This library should **not** be used to interpolate text into shell scripts. It's designed for readability, not absolute safety. Consider using the [`shell-escape`](https://crates.io/crates/shell-escape) crate instead (or ideally, passing in the values in some other way).
+- The output is not compatible with every single shell.
+- [PowerShell treats quotes differently in arguments to external commands](https://stackoverflow.com/questions/6714165). This library is tuned for arguments to internal commandlets.
 
 ## Invalid unicode
 On Unix:
@@ -93,22 +104,20 @@ assert_eq!("\u{200B}".maybe_quote().to_string(), "'\u{200B}'");
 
 It still misleadingly looks like `''` when printed, but it's possible to copy and paste it and get the right result.
 
-## Limitations
-- Unicode may be quoted but is never escaped. The printed text can still look weird, and a few (buggy) terminals may drop certain characters.
-- This library should **not** be used to interpolate text into shell scripts. It's designed for readability, not absolute safety. Consider using the [`shell-escape`](https://crates.io/crates/shell-escape) crate instead (or ideally, passing in the values in some other way).
-- A few string types do not implement `Quotable` because they do not implement `AsRef<OsStr>`, notably `Cow<str>`. A workaround is to write `text.as_ref().quote()`.
-- It's not possible to use another platform's quoting style. The design is oriented around `OsString`s which have different semantics per platform.
-- The output is not compatible with every single shell.
+## Cross-platform usage
+`Quoted` has constructors for specific platforms. `Quoted::unix("some string")` will quote with bash/ksh syntax no matter the platform, and `Quoted::windows("etc")` uses PowerShell syntax.
 
-## Other platforms
-This library also works on platforms other than Unix and Windows.
+`Quoted::unix_raw` and `Quoted::windows_raw` take `&[u8]` (for malformed UTF-8) and `&[u16]` (for malformed UTF-16), respectively.
 
-WASI uses the same implementation as Unix, in part because its `OsString`s match Unix's. I'm not sure how much sense that makes since it can run on non-Unix platforms, so if you have a better idea, please open an issue.
+`Quoted::native(&str)` and `Quoted::native_raw(&OsStr)` can be used as an alternative to the extension trait if you prefer boring monomorphic functions.
 
-Other platforms use a fallback implementation based on Rust's builtin escaping.
+## `no_std`
+This crate is `no_std`-compatible if the `alloc` and/or `std` features are disabled.
 
-# Testing
-The Unix implementation has been fuzzed against bash, zsh, mksh, ksh93 and busybox to ensure all output is interpreted back as the original string. It has been fuzzed to a more limited extent against fish, dash, tcsh, posh, and yash (which don't support all of the required syntax).
+## Testing
+The Unix implementation has been [fuzzed](https://github.com/rust-fuzz/cargo-fuzz) against bash, zsh, mksh, ksh93 and busybox to ensure all output is interpreted back as the original string. It has been fuzzed to a more limited extent against fish, dash, tcsh, posh, and yash (which don't support all of the required syntax).
+
+The PowerShell implementation has been fuzzed against PowerShell Core 7.1.4 running on Linux.
 
 ## Acknowledgments
 This library is modeled after the quoting done by [Gnulib](https://www.gnu.org/software/gnulib/) as seen in the GNU coreutils. The behavior is not identical, however:
