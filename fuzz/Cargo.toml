@@ -15,6 +15,7 @@ unicode-width = "0.1.9"
 
 [dependencies.os_display]
 path = ".."
+features = ["unix", "windows"]
 
 # Prevent this from interfering with workspaces
 [workspace]

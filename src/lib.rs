@@ -25,11 +25,10 @@
 //! ```
 
 #![no_std]
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
-use core::{
-    fmt::{self, Display, Formatter},
-    str::from_utf8,
-};
+use core::fmt::{self, Display, Formatter};
 
 #[cfg(feature = "std")]
 extern crate std;
@@ -39,13 +38,18 @@ extern crate std;
 // 1.36 is the minimum version that supports alloc without std.
 #[cfg(all(feature = "alloc", not(feature = "std")))]
 extern crate alloc;
+
+#[cfg(feature = "windows")]
 #[cfg(feature = "std")]
 use std as alloc;
 
+#[cfg(feature = "native")]
 #[cfg(feature = "std")]
 use std::{ffi::OsStr, path::Path};
 
+#[cfg(any(feature = "unix", all(feature = "native", not(windows))))]
 mod unix;
+#[cfg(any(feature = "windows", all(feature = "native", windows)))]
 mod windows;
 
 /// A wrapper around string types for displaying with quoting and escaping applied.
@@ -57,11 +61,16 @@ pub struct Quoted<'a> {
 
 #[derive(Debug, Copy, Clone)]
 enum Kind<'a> {
+    #[cfg(any(feature = "unix", all(feature = "native", not(windows))))]
     Unix(&'a str),
+    #[cfg(feature = "unix")]
     UnixRaw(&'a [u8]),
+    #[cfg(any(feature = "windows", all(feature = "native", windows)))]
     Windows(&'a str),
+    #[cfg(feature = "windows")]
     #[cfg(feature = "alloc")]
     WindowsRaw(&'a [u16]),
+    #[cfg(feature = "native")]
     #[cfg(feature = "std")]
     NativeRaw(&'a std::ffi::OsStr),
 }
@@ -74,38 +83,58 @@ impl<'a> Quoted<'a> {
         }
     }
 
-    /// Quote a string in the default style for the platform.
+    /// Quote a string with the default style for the platform.
+    ///
+    /// On Windows this is PowerShell syntax, on all other platforms this is
+    /// bash/ksh syntax.
+    #[cfg(feature = "native")]
     pub fn native(text: &'a str) -> Self {
         #[cfg(windows)]
-        return Quoted::windows(text);
+        return Quoted::new(Kind::Windows(text));
         #[cfg(not(windows))]
-        return Quoted::unix(text);
+        return Quoted::new(Kind::Unix(text));
     }
 
-    /// Quote a native string in the default style for the platform.
+    /// Quote an `OsStr` with the default style for the platform.
+    ///
+    /// On platforms other than Windows, Unix and WASI, if the encoding is
+    /// invalid, the `Debug` representation will be used.
+    #[cfg(feature = "native")]
     #[cfg(feature = "std")]
     pub fn native_raw(text: &'a OsStr) -> Self {
         Quoted::new(Kind::NativeRaw(text))
     }
 
     /// Quote a string using bash/ksh syntax.
+    ///
+    /// This requires the optional `unix` feature.
+    #[cfg(feature = "unix")]
     pub fn unix(text: &'a str) -> Self {
         Quoted::new(Kind::Unix(text))
     }
 
     /// Quote possibly invalid UTF-8 using bash/ksh syntax.
+    ///
+    /// This requires the optional `unix` feature.
+    #[cfg(feature = "unix")]
     pub fn unix_raw(bytes: &'a [u8]) -> Self {
         Quoted::new(Kind::UnixRaw(bytes))
     }
 
     /// Quote a string using PowerShell syntax.
+    ///
+    /// This requires the optional `windows` feature.
+    #[cfg(feature = "windows")]
     pub fn windows(text: &'a str) -> Self {
         Quoted::new(Kind::Windows(text))
     }
 
     /// Quote possibly invalid UTF-16 using PowerShell syntax.
     ///
-    /// This allocates. The `alloc` feature must not be disabled.
+    /// This requires the optional `windows` feature.
+    ///
+    /// It also requires the (default) `alloc` feature.
+    #[cfg(feature = "windows")]
     #[cfg(feature = "alloc")]
     pub fn windows_raw(units: &'a [u16]) -> Self {
         Quoted::new(Kind::WindowsRaw(units))
@@ -124,6 +153,7 @@ impl<'a> Quoted<'a> {
 impl<'a> Display for Quoted<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.source {
+            #[cfg(feature = "native")]
             #[cfg(feature = "std")]
             Kind::NativeRaw(text) => {
                 #[cfg(unix)]
@@ -136,11 +166,7 @@ impl<'a> Display for Quoted<'a> {
                 #[cfg(windows)]
                 match text.to_str() {
                     Some(text) => windows::write(f, text, self.force_quote),
-                    None => windows::write_escaped(
-                        f,
-                        core::char::decode_utf16(text.encode_wide())
-                            .map(|res| res.map_err(|err| err.unpaired_surrogate())),
-                    ),
+                    None => windows::write_escaped(f, decode_utf16(text.encode_wide())),
                 }
                 #[cfg(any(unix, target_os = "wasi"))]
                 match text.to_str() {
@@ -150,105 +176,130 @@ impl<'a> Display for Quoted<'a> {
                 #[cfg(not(any(windows, unix, target_os = "wasi")))]
                 match text.to_str() {
                     Some(text) => unix::write(f, text, self.force_quote),
-                    // Debug is the only way to avoid losing information.
+                    // Debug is our best shot for not losing information.
                     // But you probably can't paste it into a shell.
                     None => write!(f, "{:?}", text),
                 }
             }
+
+            #[cfg(any(feature = "unix", all(feature = "native", not(windows))))]
             Kind::Unix(text) => unix::write(f, text, self.force_quote),
-            Kind::UnixRaw(bytes) => match from_utf8(bytes) {
+
+            #[cfg(feature = "unix")]
+            Kind::UnixRaw(bytes) => match core::str::from_utf8(bytes) {
                 Ok(text) => unix::write(f, text, self.force_quote),
                 Err(_) => unix::write_escaped(f, bytes),
             },
+
+            #[cfg(any(feature = "windows", all(feature = "native", windows)))]
             Kind::Windows(text) => windows::write(f, text, self.force_quote),
+
+            #[cfg(feature = "windows")]
             #[cfg(feature = "alloc")]
             // Avoiding this allocation is possible in theory, but it'd require either
             // complicating or slowing down the common case.
             // Perhaps we could offer a non-allocating API for known-invalid UTF-16 strings
             // that we pass straight to write_escaped(), but it seems a bit awkward.
+            // Please open an issue if you have a need for this.
             Kind::WindowsRaw(units) => match alloc::string::String::from_utf16(units) {
                 Ok(text) => windows::write(f, &text, self.force_quote),
-                Err(_) => windows::write_escaped(
-                    f,
-                    core::char::decode_utf16(units.iter().cloned())
-                        .map(|res| res.map_err(|err| err.unpaired_surrogate())),
-                ),
+                Err(_) => windows::write_escaped(f, decode_utf16(units.iter().cloned())),
             },
         }
     }
 }
 
-/// An extension trait for safely displaying strings in a terminal.
-pub trait Quotable {
-    /// Returns an object that implements [`Display`] for printing strings with
-    /// proper quoting and escaping for the platform.
-    ///
-    /// On Unix this corresponds to bash/ksh syntax, on Windows PowerShell syntax
-    /// is used.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::path::Path;
-    /// use os_display::Quotable;
-    ///
-    /// let path = Path::new("foo/bar.baz");
-    ///
-    /// println!("Found file {}", path.quote()); // Prints "Found file 'foo/bar.baz'"
-    /// ```
-    fn quote(&self) -> Quoted<'_>;
+#[cfg(any(feature = "windows", all(feature = "native", feature = "std", windows)))]
+#[cfg(feature = "alloc")]
+fn decode_utf16(units: impl IntoIterator<Item = u16>) -> impl Iterator<Item = Result<char, u16>> {
+    core::char::decode_utf16(units).map(|res| res.map_err(|err| err.unpaired_surrogate()))
+}
 
-    /// Like `quote()`, but don't actually add quotes unless necessary because of
-    /// whitespace or special characters.
+#[cfg(feature = "native")]
+mod native {
+    use super::*;
+
+    /// An extension trait to apply quoting to strings.
     ///
-    /// # Examples
+    /// This is implemented on `str`, `OsStr` and `Path`.
     ///
-    /// ```
-    /// use std::path::Path;
-    /// use os_display::Quotable;
-    ///
-    /// let foo = Path::new("foo/bar.baz");
-    /// let bar = "foo bar";
-    ///
-    /// println!("{}: Not found", foo.maybe_quote()); // Prints "foo/bar.baz: Not found"
-    /// println!("{}: Not found", bar.maybe_quote()); // Prints "'foo bar': Not found"
-    /// ```
-    fn maybe_quote(&self) -> Quoted<'_> {
-        let mut quoted = self.quote();
-        quoted.force_quote = false;
-        quoted
+    /// For finer control, see the constructors on [`Quoted`].
+    pub trait Quotable {
+        /// Returns an object that implements [`Display`] for printing strings with
+        /// proper quoting and escaping for the platform.
+        ///
+        /// On Unix this corresponds to bash/ksh syntax, on Windows PowerShell syntax
+        /// is used.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use std::path::Path;
+        /// use os_display::Quotable;
+        ///
+        /// let path = Path::new("foo/bar.baz");
+        ///
+        /// println!("Found file {}", path.quote()); // Prints "Found file 'foo/bar.baz'"
+        /// ```
+        fn quote(&self) -> Quoted<'_>;
+
+        /// Like `quote()`, but don't actually add quotes unless necessary because of
+        /// whitespace or special characters.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use std::path::Path;
+        /// use os_display::Quotable;
+        ///
+        /// let foo = Path::new("foo/bar.baz");
+        /// let bar = "foo bar";
+        ///
+        /// println!("{}: Not found", foo.maybe_quote()); // Prints "foo/bar.baz: Not found"
+        /// println!("{}: Not found", bar.maybe_quote()); // Prints "'foo bar': Not found"
+        /// ```
+        fn maybe_quote(&self) -> Quoted<'_> {
+            let mut quoted = self.quote();
+            quoted.force_quote = false;
+            quoted
+        }
+    }
+
+    impl Quotable for str {
+        fn quote(&self) -> Quoted<'_> {
+            Quoted::native(self)
+        }
+    }
+
+    #[cfg(feature = "std")]
+    impl Quotable for OsStr {
+        fn quote(&self) -> Quoted<'_> {
+            Quoted::native_raw(self)
+        }
+    }
+
+    #[cfg(feature = "std")]
+    impl Quotable for Path {
+        fn quote(&self) -> Quoted<'_> {
+            Quoted::native_raw(self.as_ref())
+        }
+    }
+
+    impl<'a, T: Quotable + ?Sized> From<&'a T> for Quoted<'a> {
+        fn from(val: &'a T) -> Self {
+            val.quote()
+        }
     }
 }
 
-impl Quotable for str {
-    fn quote(&self) -> Quoted<'_> {
-        Quoted::native(self)
-    }
-}
-
-#[cfg(feature = "std")]
-impl Quotable for OsStr {
-    fn quote(&self) -> Quoted<'_> {
-        Quoted::native_raw(self)
-    }
-}
-
-#[cfg(feature = "std")]
-impl Quotable for Path {
-    fn quote(&self) -> Quoted<'_> {
-        Quoted::native_raw(self.as_ref())
-    }
-}
-
-impl<'a, T: Quotable + ?Sized> From<&'a T> for Quoted<'a> {
-    fn from(val: &'a T) -> Self {
-        val.quote()
-    }
-}
+#[cfg(feature = "native")]
+pub use crate::native::Quotable;
 
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
+    #![allow(unused)]
+
     use super::*;
 
     use std::string::ToString;
@@ -297,6 +348,7 @@ mod tests {
         (b"foo\xFFbar", r#"$'foo\xFF'$'bar'"#),
     ];
 
+    #[cfg(feature = "unix")]
     #[test]
     fn unix() {
         for &(orig, expected) in UNIX_ALWAYS.iter().chain(BOTH_ALWAYS) {
@@ -331,6 +383,7 @@ mod tests {
     ];
     const WINDOWS_RAW: &[(&[u16], &str)] = &[(&[b'x' as u16, 0xD800], r#""x`u{D800}""#)];
 
+    #[cfg(feature = "windows")]
     #[test]
     fn windows() {
         for &(orig, expected) in WINDOWS_ALWAYS.iter().chain(BOTH_ALWAYS) {
@@ -344,6 +397,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "native")]
     #[cfg(windows)]
     #[test]
     fn native() {
@@ -360,6 +414,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "native")]
     #[cfg(any(unix, target_os = "wasi"))]
     #[test]
     fn native() {
@@ -376,6 +431,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "native")]
     #[cfg(not(any(windows, unix, target_os = "wasi")))]
     #[test]
     fn native() {
@@ -383,6 +439,7 @@ mod tests {
         assert_eq!("x\0".quote().to_string(), r#"$'x\x00'"#);
     }
 
+    #[cfg(feature = "native")]
     #[test]
     fn can_quote_types() {
         use std::borrow::{Cow, ToOwned};

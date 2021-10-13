@@ -5,7 +5,11 @@
 [![MSRV](https://img.shields.io/badge/MSRV-1.31-blue)](https://blog.rust-lang.org/2018/12/06/Rust-1.31-and-rust-2018.html)
 [![CI](https://img.shields.io/github/workflow/status/blyxxyz/os_display/CI/master)](https://github.com/blyxxyz/os_display/actions)
 
-Printing filenames can be tricky. They may contain control codes that mess up the message or even the whole terminal. They may not be safe to use in a command without quoting or escaping. They may also contain invalid unicode.
+Printing strings can be tricky. They may contain control codes that mess up the message or even the whole terminal. On Unix even filenames can contain characters like that.
+
+Filenames may also contain invalid unicode, which is not preserved by [`Path::display`](https://doc.rust-lang.org/std/path/struct.Path.html#method.display).
+
+Finally, they can contain special characters that aren't safe to use in a command without quoting or escaping.
 
 This library lets you add quoting to filenames (and other strings) to display them more safely and usefully. The goal is to render them in such a way that they can always be copied and pasted back into a shell without information loss.
 
@@ -60,7 +64,7 @@ println!("{}: Not found", "*?$".maybe_quote());
 `.quote()` is best used inside longer sentences while `.maybe_quote()` can be used for text that's already separated some other way (like by a colon).
 
 ## Limitations
-- Unicode may be quoted but is not escaped. The printed text can still look weird, and a few (buggy) terminals may drop certain characters.
+- Unicode may be quoted but is not escaped. The printed text can still look weird, and a few (buggy) terminals drop certain characters.
 - This library should **not** be used to interpolate text into shell scripts. It's designed for readability, not absolute safety. Consider using the [`shell-escape`](https://crates.io/crates/shell-escape) crate instead (or ideally, passing in the values in some other way).
 - The output is not compatible with every single shell.
 - [PowerShell treats quotes differently in arguments to external commands](https://stackoverflow.com/questions/6714165). This library is tuned for arguments to internal commandlets.
@@ -104,15 +108,25 @@ assert_eq!("\u{200B}".maybe_quote().to_string(), "'\u{200B}'");
 
 It still misleadingly looks like `''` when printed, but it's possible to copy and paste it and get the right result.
 
-## Cross-platform usage
-`Quoted` has constructors for specific platforms. `Quoted::unix("some string")` will quote with bash/ksh syntax no matter the platform, and `Quoted::windows("etc")` uses PowerShell syntax.
+## Feature flags
+By default you can only use the current platform's quoting style. That's appropriate most of the time.
+
+### `windows`/`unix`
+The `windows` and `unix` optional features can be enabled to add constructors to `Quoted`.
+
+`Quoted::unix("some string")` will quote with bash/ksh syntax no matter the platform, and `Quoted::windows("etc")` uses PowerShell syntax.
 
 `Quoted::unix_raw` and `Quoted::windows_raw` take `&[u8]` (for malformed UTF-8) and `&[u16]` (for malformed UTF-16), respectively.
 
-`Quoted::native(&str)` and `Quoted::native_raw(&OsStr)` can be used as an alternative to the extension trait if you prefer boring monomorphic functions.
+### `native`
+The `native` feature (enabled by default) is required for the `Quotable` trait and the `Quoted::native(&str)` and `Quoted::native_raw(&OsStr)` constructors. If it's not enabled then the quoting style has to be chosen explicitly.
 
-## `no_std`
+`Quoted::native` and `Quoted::native_raw` may be used as an alternative to the `Quotable` trait if you prefer boring functions.
+
+### `alloc`/`std`
 This crate is `no_std`-compatible if the `alloc` and/or `std` features are disabled.
+
+The `std` feature is required to quote `OsStr`s. The `alloc` feature is required for `Quoted::windows_raw`.
 
 ## Testing
 The Unix implementation has been [fuzzed](https://github.com/rust-fuzz/cargo-fuzz) against bash, zsh, mksh, ksh93 and busybox to ensure all output is interpreted back as the original string. It has been fuzzed to a more limited extent against fish, dash, tcsh, posh, and yash (which don't support all of the required syntax).
