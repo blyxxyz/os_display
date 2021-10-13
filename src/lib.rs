@@ -222,6 +222,17 @@ fn decode_utf16(units: impl IntoIterator<Item = u16>) -> impl Iterator<Item = Re
     core::char::decode_utf16(units).map(|res| res.map_err(|err| err.unpaired_surrogate()))
 }
 
+/// Characters that may not be safe to print in a terminal.
+///
+/// This includes all the ASCII control characters.
+///
+/// U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR are currently the only
+/// in their categories. The terminals I tried don't treat them very specially,
+/// but gedit does.
+fn requires_escape(ch: char) -> bool {
+    ch.is_control() || ch == '\u{2028}' || ch == '\u{2029}'
+}
+
 #[cfg(feature = "native")]
 mod native {
     use super::*;
@@ -351,6 +362,7 @@ mod tests {
         ("\r", r#"$'\r'"#),
         ("\u{85}", r#"$'\xC2\x85'"#),
         ("\u{85}a", r#"$'\xC2\x85'$'a'"#),
+        ("\u{2028}", r#"$'\xE2\x80\xA8'"#),
     ];
     const UNIX_RAW: &[(&[u8], &str)] = &[
         (b"foo\xFF", r#"$'foo\xFF'"#),
@@ -390,6 +402,7 @@ mod tests {
         ("\t", r#""`t""#),
         ("\r", r#""`r""#),
         ("\u{85}", r#""`u{85}""#),
+        ("\u{2028}", r#""`u{2028}""#),
     ];
     const WINDOWS_RAW: &[(&[u16], &str)] = &[(&[b'x' as u16, 0xD800], r#""x`u{D800}""#)];
 

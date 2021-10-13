@@ -24,13 +24,7 @@ fuzz_target!(|data: &[u8]| {
         assert!(text.chars().next().unwrap().width().unwrap_or(0) != 0);
     }
     for &case in &[&quoted, &maybe_quoted] {
-        assert!(
-            !case
-                .chars()
-                .any(|ch| ch.is_ascii_control() || ch.is_control()),
-            "{:?}",
-            case
-        );
+        assert!(!case.chars().any(|ch| ch.is_control()), "{:?}", case);
         assert!(!case.contains('\n'), "{:?}", case);
     }
 
@@ -47,13 +41,7 @@ fuzz_target!(|data: &[u8]| {
             assert!(text.chars().next().unwrap().width().unwrap_or(0) != 0);
         }
         for &case in &[&quoted, &maybe_quoted] {
-            assert!(
-                !case
-                    .chars()
-                    .any(|ch| ch.is_ascii_control() || ch.is_control()),
-                "{:?}",
-                case
-            );
+            assert!(!case.chars().any(|ch| ch.is_control()), "{:?}", case);
             assert!(!case.contains('\n'), "{:?}", case);
         }
     }

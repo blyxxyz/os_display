@@ -75,7 +75,7 @@ pub(crate) fn write(f: &mut Formatter<'_>, text: &str, force_quote: bool) -> fmt
                 // This check goes stale when new whitespace codepoints are assigned.
                 requires_quote = true;
             }
-            if ch.is_control() {
+            if crate::requires_escape(ch) {
                 return write_escaped(f, text.as_bytes());
             }
         }
@@ -155,15 +155,10 @@ pub(crate) fn write_escaped(f: &mut Formatter<'_>, text: &[u8]) -> fmt::Result {
                         // and null bytes can't appear in arguments anyway,
                         // so let's stay clear of that.
                         // Some but not all shells have \e for \x1B.
-                        ch if ch.is_ascii_control() => {
-                            write!(f, "\\x{:02X}", ch as u8)?;
-                            in_escape = true;
-                        }
-                        ch if ch.is_control() => {
-                            // These have to be escaped.
+                        ch if crate::requires_escape(ch) => {
                             // Most shells support \uXXXX escape codes, but busybox sh
-                            // doesn't, so encode the raw UTF-8. Bit unfortunate, but
-                            // GNU does the same.
+                            // doesn't, so we always encode the raw UTF-8. Bit unfortunate,
+                            // but GNU does the same.
                             for &byte in ch.encode_utf8(&mut [0; 4]).as_bytes() {
                                 write!(f, "\\x{:02X}", byte)?;
                             }
