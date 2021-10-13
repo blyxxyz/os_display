@@ -45,7 +45,7 @@ println!("Found file {}", "foo'bar".quote());
 
 // Unix: Found file $'foo\nbar'
 // Windows: Found file "foo`nbar"
-println!("Found file {}", "ab\ncd".quote());
+println!("Found file {}", "foo\nbar".quote());
 ```
 
 `.maybe_quote()` only adds them if necessary because of whitespace or special characters:
@@ -77,8 +77,8 @@ use std::ffi::OsStr;
 use std::os::unix::ffi::OsStrExt;
 
 // \xFF makes this invalid UTF-8, so to_str() would fail
-let bad_string = OsStr::from_bytes(b"bar\xFFqux");
-assert_eq!(bad_string.quote().to_string(), "$'bar\xFFqux'");
+let bad_string = OsStr::from_bytes(&[b'x', 0xFF, b'y']);
+assert_eq!(bad_string.quote().to_string(), r#"$'x\xFFy'"#);
 ```
 
 On Windows:
@@ -89,7 +89,7 @@ use std::os::windows::ffi::OsStringExt;
 
 // 0xD800 is an unpaired surrogate, making this invalid UTF-16
 let bad_string = OsString::from_wide(&[b'a' as u16, 0xD800, b'b' as u16]);
-assert_eq!(bad_string.quote().to_string(), r#""a`u{D800}b""#)
+assert_eq!(bad_string.quote().to_string(), r#""a`u{D800}b""#);
 ```
 
 ## Zero-width unicode
