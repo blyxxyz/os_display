@@ -119,6 +119,13 @@ fn write_single_escaped(f: &mut Formatter<'_>, text: &str) -> fmt::Result {
     // Quotes in PowerShell are escaped by doubling them.
     // The second quote is used, so '‘ becomes ‘.
     // Therefore we insert a ' before every quote we find.
+
+    // If we think something is a single quote and quote it but the PowerShell
+    // version doesn't (e.g. because it's old) then things go wrong. I don't
+    // know of a way to solve this. A ` (backtick) escape only works between
+    // double quotes or in a bare string. We can't unquote, use a bare string,
+    // then requote, as we would in Unix: PowerShell sees that as multiple
+    // arguments.
     f.write_char('\'')?;
     let mut pos = 0;
     for (index, _) in text.match_indices(unicode::is_single_quote) {
@@ -157,7 +164,11 @@ pub(crate) fn write_escaped(
                 '`' => f.write_str("``")?,
                 '$' => f.write_str("`$")?,
                 ch if unicode::is_double_quote(ch) => {
-                    f.write_char('"')?;
+                    // We can quote this with either ` or ".
+                    // But if we use " and the PowerShell version doesn't actually
+                    // see this as a double quote then we're in trouble.
+                    // ` is safer.
+                    f.write_char('`')?;
                     f.write_char(ch)?;
                 }
                 ch => f.write_char(ch)?,
