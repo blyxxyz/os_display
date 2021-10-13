@@ -10,7 +10,7 @@ const directory = "target/wasm32-unknown-unknown/debug/deps";
 
 child_process.execSync("cargo clean --target wasm32-unknown-unknown");
 child_process.execSync(
-    "cargo +1.31 test --lib --target wasm32-unknown-unknown --no-run"
+    "cargo +1.31 test --all-features --lib --target wasm32-unknown-unknown --no-run"
 );
 
 let path;
