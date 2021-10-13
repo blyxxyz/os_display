@@ -65,14 +65,19 @@ pub(crate) fn write(f: &mut Formatter<'_>, text: &str, force_quote: bool) -> fmt
             if ch.is_ascii_control() {
                 return write_escaped(f, text.as_bytes());
             }
-        } else if !requires_quote && ch.is_whitespace() {
-            // yash splits on unicode whitespace.
-            // fish ignores unicode whitespace at the start of a bare string.
-            // Therefore we quote unicode whitespace.
-            // This has benefits for readability, but some blank characters
-            // are not considered whitespace, like U+2800 BRAILLE PATTERN BLANK.
-            // This check goes stale when new whitespace codepoints are assigned.
-            requires_quote = true;
+        } else {
+            if !requires_quote && ch.is_whitespace() {
+                // yash splits on unicode whitespace.
+                // fish ignores unicode whitespace at the start of a bare string.
+                // Therefore we quote unicode whitespace.
+                // This has benefits for readability, but some blank characters
+                // are not considered whitespace, like U+2800 BRAILLE PATTERN BLANK.
+                // This check goes stale when new whitespace codepoints are assigned.
+                requires_quote = true;
+            }
+            if ch.is_control() {
+                return write_escaped(f, text.as_bytes());
+            }
         }
     }
 
@@ -152,6 +157,16 @@ pub(crate) fn write_escaped(f: &mut Formatter<'_>, text: &[u8]) -> fmt::Result {
                         // Some but not all shells have \e for \x1B.
                         ch if ch.is_ascii_control() => {
                             write!(f, "\\x{:02X}", ch as u8)?;
+                            in_escape = true;
+                        }
+                        ch if ch.is_control() => {
+                            // These have to be escaped.
+                            // Most shells support \uXXXX escape codes, but busybox sh
+                            // doesn't, so encode the raw UTF-8. Bit unfortunate, but
+                            // GNU does the same.
+                            for &byte in ch.encode_utf8(&mut [0; 4]).as_bytes() {
+                                write!(f, "\\x{:02X}", byte)?;
+                            }
                             in_escape = true;
                         }
                         '\\' | '\'' => {

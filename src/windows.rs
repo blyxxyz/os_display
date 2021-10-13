@@ -94,6 +94,9 @@ pub(crate) fn write(f: &mut Formatter<'_>, text: &str, force_quote: bool) -> fmt
                 is_single_safe = false;
                 requires_quote = true;
             }
+            if ch.is_control() {
+                return write_escaped(f, text.chars().map(Ok));
+            }
         }
     }
 
@@ -160,7 +163,9 @@ pub(crate) fn write_escaped(
                 '\x08' => f.write_str("`b")?,
                 '\x0b' => f.write_str("`v")?,
                 '\x0c' => f.write_str("`f")?,
-                ch if ch.is_ascii_control() => write!(f, "`u{{{:02X}}}", ch as u8)?,
+                ch if ch.is_ascii_control() || ch.is_control() => {
+                    write!(f, "`u{{{:02X}}}", ch as u32)?
+                }
                 '`' => f.write_str("``")?,
                 '$' => f.write_str("`$")?,
                 ch if unicode::is_double_quote(ch) => {

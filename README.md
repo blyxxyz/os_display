@@ -64,7 +64,7 @@ println!("{}: Not found", "*?$".maybe_quote());
 `.quote()` is best used inside longer sentences while `.maybe_quote()` can be used for text that's already separated some other way (like by a colon).
 
 ## Limitations
-- Unicode may be quoted but is not escaped. The printed text can still look weird, and a few (buggy) terminals drop certain characters.
+- Unicode may be quoted but only control characters are escaped. The printed text can still look weird, and a few (buggy) terminals drop certain characters.
 - This library should **not** be used to interpolate text into shell scripts. It's designed for readability, not absolute safety. Consider using the [`shell-escape`](https://crates.io/crates/shell-escape) crate instead (or ideally, passing in the values in some other way).
 - The output is not compatible with every single shell.
 - [PowerShell treats quotes differently in arguments to external commands](https://stackoverflow.com/questions/6714165). This library is tuned for arguments to internal commandlets.
