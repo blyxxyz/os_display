@@ -5,15 +5,15 @@
 [![MSRV](https://img.shields.io/badge/MSRV-1.31-blue)](https://blog.rust-lang.org/2018/12/06/Rust-1.31-and-rust-2018.html)
 [![CI](https://img.shields.io/github/workflow/status/blyxxyz/os_display/CI/master)](https://github.com/blyxxyz/os_display/actions)
 
-Printing strings can be tricky. They may contain control codes that mess up the message or even the whole terminal. On Unix even filenames can contain characters like that.
+Printing strings can be tricky. They may contain control codes that mess up the message or the whole terminal. On Unix even filenames can contain characters like that.
 
 Filenames may also contain invalid unicode, which is not preserved by [`Path::display`](https://doc.rust-lang.org/std/path/struct.Path.html#method.display).
 
 Finally, they can contain special characters that aren't safe to use in a command without quoting or escaping.
 
-This library lets you add quoting to filenames (and other strings) to display them more safely and usefully. The goal is to render them in such a way that they can always be copied and pasted back into a shell without information loss.
+This library lets you add quoting to filenames (and other strings) to display them more safely and usefully. The goal is to render them in such a way that they can be copied and pasted back into a shell without information loss.
 
-On Unix values are quoted using bash/ksh syntax, while on Windows PowerShell syntax is used. Other platforms currently default to the Unix style.
+On Unix (and other platforms) values are quoted using bash/ksh syntax, while on Windows PowerShell syntax is used.
 
 ## When should I use this?
 
@@ -121,12 +121,18 @@ The `windows` and `unix` optional features can be enabled to add constructors to
 ### `native`
 The `native` feature (enabled by default) is required for the `Quotable` trait and the `Quoted::native(&str)` and `Quoted::native_raw(&OsStr)` constructors. If it's not enabled then the quoting style has to be chosen explicitly.
 
-`Quoted::native` and `Quoted::native_raw` may be used as an alternative to the `Quotable` trait if you prefer boring functions.
-
 ### `alloc`/`std`
 This crate is `no_std`-compatible if the `alloc` and/or `std` features are disabled.
 
 The `std` feature is required to quote `OsStr`s. The `alloc` feature is required for `Quoted::windows_raw`.
+
+## Alternative constructors
+`Quoted` has constructors for specific styles as well as `Quoted::native()` and `Quoted::native_raw()`. These can be used as an alternative to the `Quotable` trait if you prefer boring functions.
+
+By default quotes are always added. To get behavior like `.maybe_quote()` use the `.force()` method:
+```rust
+println!("{}", Quoted::native(x).force(false));
+```
 
 ## Testing
 The Unix implementation has been [fuzzed](https://github.com/rust-fuzz/cargo-fuzz) against bash, zsh, mksh, ksh93 and busybox to ensure all output is interpreted back as the original string. It has been fuzzed to a more limited extent against fish, dash, tcsh, posh, and yash (which don't support all of the required syntax).

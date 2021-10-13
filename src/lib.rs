@@ -221,7 +221,7 @@ mod native {
 
     /// An extension trait to apply quoting to strings.
     ///
-    /// This is implemented on `str`, `OsStr` and `Path`.
+    /// This is implemented on [`str`], [`OsStr`] and [`Path`].
     ///
     /// For finer control, see the constructors on [`Quoted`].
     pub trait Quotable {
