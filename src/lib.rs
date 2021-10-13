@@ -9,9 +9,8 @@
 //!
 //! # Examples
 //! ```
-//! # fn example() -> Result<(), std::io::Error> {
 //! use std::path::Path;
-//! use os_display::{Quotable, Quoted};
+//! use os_display::Quotable;
 //!
 //! let path = Path::new("foo/bar.baz");
 //!
@@ -19,9 +18,17 @@
 //! println!("Found file {}", path.quote());
 //! // foo/bar.baz: Not found
 //! println!("{}: Not found", path.maybe_quote());
+//! ```
+//!
+//! If the `windows`/`unix` features are enabled:
+//!
+//! ```
+//! use os_display::Quoted;
+//!
 //! // "foo`nbar"
-//! println!("{}", Quoted::windows("foo\nbar").force(false));
-//! # Ok(()) }
+//! println!("{}", Quoted::windows("foo\nbar"));
+//! // $'foo\nbar'
+//! println!("{}", Quoted::unix("foo\nbar"));
 //! ```
 
 #![no_std]
