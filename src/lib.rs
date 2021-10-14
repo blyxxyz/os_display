@@ -114,6 +114,7 @@ impl<'a> Quoted<'a> {
 
     /// Quote a string using bash/ksh syntax.
     ///
+    /// # Optional
     /// This requires the optional `unix` feature.
     #[cfg(feature = "unix")]
     pub fn unix(text: &'a str) -> Self {
@@ -122,6 +123,7 @@ impl<'a> Quoted<'a> {
 
     /// Quote possibly invalid UTF-8 using bash/ksh syntax.
     ///
+    /// # Optional
     /// This requires the optional `unix` feature.
     #[cfg(feature = "unix")]
     pub fn unix_raw(bytes: &'a [u8]) -> Self {
@@ -130,6 +132,7 @@ impl<'a> Quoted<'a> {
 
     /// Quote a string using PowerShell syntax.
     ///
+    /// # Optional
     /// This requires the optional `windows` feature.
     #[cfg(feature = "windows")]
     pub fn windows(text: &'a str) -> Self {
@@ -138,9 +141,8 @@ impl<'a> Quoted<'a> {
 
     /// Quote possibly invalid UTF-16 using PowerShell syntax.
     ///
-    /// This requires the optional `windows` feature.
-    ///
-    /// It also requires the (default) `alloc` feature.
+    /// # Optional
+    /// This requires the optional `windows` feature and the (default) `alloc` feature.
     #[cfg(feature = "windows")]
     #[cfg(feature = "alloc")]
     pub fn windows_raw(units: &'a [u16]) -> Self {
