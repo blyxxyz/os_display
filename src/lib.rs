@@ -227,12 +227,34 @@ fn decode_utf16(units: impl IntoIterator<Item = u16>) -> impl Iterator<Item = Re
 /// Characters that may not be safe to print in a terminal.
 ///
 /// This includes all the ASCII control characters.
-///
+fn requires_escape(ch: char) -> bool {
+    ch.is_control() || is_separator(ch) || is_dangerous_bidi(ch)
+}
+
 /// U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR are currently the only
 /// in their categories. The terminals I tried don't treat them very specially,
 /// but gedit does.
-fn requires_escape(ch: char) -> bool {
-    ch.is_control() || ch == '\u{2028}' || ch == '\u{2029}'
+fn is_separator(ch: char) -> bool {
+    ch == '\u{2028}' || ch == '\u{2029}'
+}
+
+/// These two ranges in PropList.txt:
+/// LEFT-TO-RIGHT EMBEDDING..RIGHT-TO-LEFT OVERRIDE
+/// LEFT-TO-RIGHT ISOLATE..POP DIRECTIONAL ISOLATE
+///
+/// ARABIC LETTER MARK and LEFT-TO-RIGHT MARK/RIGHT-TO-LEFT MARK don't appear
+/// to be dangerous, and escaping them could mess up legitimate text.
+///
+/// For more info, see this Rust CVE:
+/// https://blog.rust-lang.org/2021/11/01/cve-2021-42574.html
+///
+/// This should be checked again for Unicode 15.0, which will release on
+/// September 11, 2022.
+fn is_dangerous_bidi(ch: char) -> bool {
+    match ch {
+        '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}' => true,
+        _ => false,
+    }
 }
 
 #[cfg(feature = "native")]
@@ -365,6 +387,10 @@ mod tests {
         ("\u{85}", r#"$'\xC2\x85'"#),
         ("\u{85}a", r#"$'\xC2\x85'$'a'"#),
         ("\u{2028}", r#"$'\xE2\x80\xA8'"#),
+        (
+            "user\u{202E} \u{2066}// Check if admin\u{2069} \u{2066}",
+            r#"$'user\xE2\x80\xAE \xE2\x81\xA6// Check if admin\xE2\x81\xA9 \xE2\x81\xA6'"#,
+        ),
     ];
     const UNIX_RAW: &[(&[u8], &str)] = &[
         (b"foo\xFF", r#"$'foo\xFF'"#),
@@ -405,6 +431,10 @@ mod tests {
         ("\r", r#""`r""#),
         ("\u{85}", r#""`u{85}""#),
         ("\u{2028}", r#""`u{2028}""#),
+        (
+            "user\u{202E} \u{2066}// Check if admin\u{2069} \u{2066}",
+            r#""user`u{202E} `u{2066}// Check if admin`u{2069} `u{2066}""#,
+        ),
     ];
     const WINDOWS_RAW: &[(&[u16], &str)] = &[(&[b'x' as u16, 0xD800], r#""x`u{D800}""#)];
 
