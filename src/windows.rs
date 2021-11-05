@@ -24,6 +24,7 @@ pub(crate) fn write(f: &mut Formatter<'_>, text: &str, force_quote: bool) -> fmt
     let mut is_single_safe = true;
     let mut is_double_safe = true;
     let mut requires_quote = force_quote;
+    let mut is_bidi = false;
 
     if !requires_quote {
         if let Some(first) = text.chars().next() {
@@ -94,10 +95,17 @@ pub(crate) fn write(f: &mut Formatter<'_>, text: &str, force_quote: bool) -> fmt
                 is_single_safe = false;
                 requires_quote = true;
             }
+            if crate::is_bidi(ch) {
+                is_bidi = true;
+            }
             if crate::requires_escape(ch) {
                 return write_escaped(f, text.chars().map(Ok));
             }
         }
+    }
+
+    if is_bidi && crate::is_suspicious_bidi(text) {
+        return write_escaped(f, text.chars().map(Ok));
     }
 
     if !requires_quote {
@@ -163,7 +171,9 @@ pub(crate) fn write_escaped(
                 '\x08' => f.write_str("`b")?,
                 '\x0b' => f.write_str("`v")?,
                 '\x0c' => f.write_str("`f")?,
-                ch if crate::requires_escape(ch) => write!(f, "`u{{{:02X}}}", ch as u32)?,
+                ch if crate::requires_escape(ch) || crate::is_bidi(ch) => {
+                    write!(f, "`u{{{:02X}}}", ch as u32)?
+                }
                 '`' => f.write_str("``")?,
                 '$' => f.write_str("`$")?,
                 ch if unicode::is_double_quote(ch) => {

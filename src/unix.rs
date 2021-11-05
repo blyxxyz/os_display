@@ -23,6 +23,7 @@ pub(crate) fn write(f: &mut Formatter<'_>, text: &str, force_quote: bool) -> fmt
     let mut is_single_safe = true;
     let mut is_double_safe = true;
     let mut requires_quote = force_quote;
+    let mut is_bidi = false;
 
     if !requires_quote {
         if let Some(first) = text.chars().next() {
@@ -75,10 +76,17 @@ pub(crate) fn write(f: &mut Formatter<'_>, text: &str, force_quote: bool) -> fmt
                 // This check goes stale when new whitespace codepoints are assigned.
                 requires_quote = true;
             }
+            if crate::is_bidi(ch) {
+                is_bidi = true;
+            }
             if crate::requires_escape(ch) {
                 return write_escaped(f, text.as_bytes());
             }
         }
+    }
+
+    if is_bidi && crate::is_suspicious_bidi(text) {
+        return write_escaped(f, text.as_bytes());
     }
 
     if !requires_quote {
@@ -155,7 +163,7 @@ pub(crate) fn write_escaped(f: &mut Formatter<'_>, text: &[u8]) -> fmt::Result {
                         // and null bytes can't appear in arguments anyway,
                         // so let's stay clear of that.
                         // Some but not all shells have \e for \x1B.
-                        ch if crate::requires_escape(ch) => {
+                        ch if crate::requires_escape(ch) || crate::is_bidi(ch) => {
                             // Most shells support \uXXXX escape codes, but busybox sh
                             // doesn't, so we always encode the raw UTF-8. Bit unfortunate,
                             // but GNU does the same.

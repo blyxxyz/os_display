@@ -12,6 +12,7 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 once_cell = "1.8.0"
 unicode-width = "0.1.9"
+unic-bidi = "0.9.0"
 
 [dependencies.os_display]
 path = ".."
@@ -36,5 +37,11 @@ doc = false
 [[bin]]
 name = "powershell"
 path = "fuzz_targets/powershell.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "bidi"
+path = "fuzz_targets/bidi.rs"
 test = false
 doc = false

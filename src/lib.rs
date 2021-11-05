@@ -228,7 +228,7 @@ fn decode_utf16(units: impl IntoIterator<Item = u16>) -> impl Iterator<Item = Re
 ///
 /// This includes all the ASCII control characters.
 fn requires_escape(ch: char) -> bool {
-    ch.is_control() || is_separator(ch) || is_dangerous_bidi(ch)
+    ch.is_control() || is_separator(ch)
 }
 
 /// U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR are currently the only
@@ -241,20 +241,80 @@ fn is_separator(ch: char) -> bool {
 /// These two ranges in PropList.txt:
 /// LEFT-TO-RIGHT EMBEDDING..RIGHT-TO-LEFT OVERRIDE
 /// LEFT-TO-RIGHT ISOLATE..POP DIRECTIONAL ISOLATE
-///
-/// ARABIC LETTER MARK and LEFT-TO-RIGHT MARK/RIGHT-TO-LEFT MARK don't appear
-/// to be dangerous, and escaping them could mess up legitimate text.
-///
-/// For more info, see this Rust CVE:
-/// https://blog.rust-lang.org/2021/11/01/cve-2021-42574.html
-///
-/// This should be checked again for Unicode 15.0, which will release on
-/// September 11, 2022.
-fn is_dangerous_bidi(ch: char) -> bool {
+fn is_bidi(ch: char) -> bool {
     match ch {
         '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}' => true,
         _ => false,
     }
+}
+
+/// Check whether text uses bidi in a potentially problematic way.
+///
+/// See https://trojansource.codes/ and
+/// https://www.unicode.org/reports/tr9/tr9-42.html.
+///
+/// If text fails this check then it's handled by write_escaped(), which
+/// escapes these bidi control characters no matter what.
+///
+/// We can safely assume that there are no newlines (or unicode separators)
+/// in the text because those would get it sent to write_escaped() earlier.
+/// In unicode terms, this is all a single paragraph.
+#[inline(never)]
+fn is_suspicious_bidi(text: &str) -> bool {
+    #[derive(Clone, Copy, PartialEq)]
+    enum Kind {
+        Formatting,
+        Isolate,
+    }
+    const STACK_SIZE: usize = 16;
+    // Can't use a Vec because of no_std
+    let mut stack: [Option<Kind>; STACK_SIZE] = [None; STACK_SIZE];
+    let mut pos = 0;
+    for ch in text.chars() {
+        match ch {
+            '\u{202A}' | '\u{202B}' | '\u{202D}' | '\u{202E}' => {
+                if pos >= STACK_SIZE {
+                    // Suspicious amount of nesting.
+                    return true;
+                }
+                stack[pos] = Some(Kind::Formatting);
+                pos += 1;
+            }
+            '\u{202C}' => {
+                if pos == 0 {
+                    // Unpaired terminator.
+                    // Not necessarily dangerous, but suspicious and
+                    // could disrupt preceding text.
+                    return true;
+                }
+                pos -= 1;
+                if stack[pos] != Some(Kind::Formatting) {
+                    // Terminator doesn't match.
+                    // UAX #9 says to pop the stack until we find a match.
+                    // But we'll keep things simple and cautious.
+                    return true;
+                }
+            }
+            '\u{2066}' | '\u{2067}' | '\u{2068}' => {
+                if pos >= STACK_SIZE {
+                    return true;
+                }
+                stack[pos] = Some(Kind::Isolate);
+                pos += 1;
+            }
+            '\u{2069}' => {
+                if pos == 0 {
+                    return true;
+                }
+                pos -= 1;
+                if stack[pos] != Some(Kind::Isolate) {
+                    return true;
+                }
+            }
+            _ => (),
+        }
+    }
+    pos != 0
 }
 
 #[cfg(feature = "native")]
@@ -344,7 +404,7 @@ mod tests {
 
     use super::*;
 
-    use std::string::ToString;
+    use std::string::{String, ToString};
 
     const BOTH_ALWAYS: &[(&str, &str)] = &[
         ("foo", "'foo'"),
@@ -367,6 +427,11 @@ mod tests {
         ("\u{200B}a", "'\u{200B}a'"),
         ("a\u{200B}", "a\u{200B}"),
         ("\u{2000}", "'\u{2000}'"),
+        // Odd but safe bidi
+        (
+            "\u{2067}\u{2066}abc\u{2069}\u{2066}def\u{2069}\u{2069}",
+            "'\u{2067}\u{2066}abc\u{2069}\u{2066}def\u{2069}\u{2069}'",
+        ),
     ];
 
     const UNIX_ALWAYS: &[(&str, &str)] = &[
@@ -387,6 +452,7 @@ mod tests {
         ("\u{85}", r#"$'\xC2\x85'"#),
         ("\u{85}a", r#"$'\xC2\x85'$'a'"#),
         ("\u{2028}", r#"$'\xE2\x80\xA8'"#),
+        // Dangerous bidi
         (
             "user\u{202E} \u{2066}// Check if admin\u{2069} \u{2066}",
             r#"$'user\xE2\x80\xAE \xE2\x81\xA6// Check if admin\xE2\x81\xA9 \xE2\x81\xA6'"#,
@@ -409,6 +475,13 @@ mod tests {
         for &(orig, expected) in UNIX_RAW {
             assert_eq!(Quoted::unix_raw(orig).to_string(), expected);
         }
+        let bidi_ok = nest_bidi(16);
+        assert_eq!(
+            Quoted::unix(&bidi_ok).to_string(),
+            "'".to_string() + &bidi_ok + "'"
+        );
+        let bidi_too_deep = nest_bidi(17);
+        assert!(Quoted::unix(&bidi_too_deep).to_string().starts_with('$'));
     }
 
     const WINDOWS_ALWAYS: &[(&str, &str)] = &[
@@ -450,6 +523,13 @@ mod tests {
         for &(orig, expected) in WINDOWS_RAW {
             assert_eq!(Quoted::windows_raw(orig).to_string(), expected);
         }
+        let bidi_ok = nest_bidi(16);
+        assert_eq!(
+            Quoted::windows(&bidi_ok).to_string(),
+            "'".to_string() + &bidi_ok + "'"
+        );
+        let bidi_too_deep = nest_bidi(17);
+        assert!(Quoted::windows(&bidi_too_deep).to_string().contains('`'));
     }
 
     #[cfg(feature = "native")]
@@ -510,5 +590,17 @@ mod tests {
         Path::new("foo").quote();
         Path::new("foo").to_owned().quote();
         Cow::Borrowed(Path::new("foo")).quote();
+    }
+
+    fn nest_bidi(n: usize) -> String {
+        let mut out = String::new();
+        for _ in 0..n {
+            out.push('\u{2066}');
+        }
+        out.push('a');
+        for _ in 0..n {
+            out.push('\u{2069}');
+        }
+        out
     }
 }

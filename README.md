@@ -109,6 +109,16 @@ assert_eq!("\u{200B}".maybe_quote().to_string(), "'\u{200B}'");
 
 It still misleadingly looks like `''` when printed, but it's possible to copy and paste it and get the right result.
 
+## Bidirectional unicode
+A carefully-crafted string can move part of itself to the end of the line:
+```console
+$ wc $'filename\u202E\u2066 [This does not belong!]\u2069\u2066'
+wc: 'filename': No such file or directory [This does not belong!]
+```
+This is known as a [*Trojan Source*](https://trojansource.codes/) attack. It uses control codes for bidirectional text.
+
+`os_display` escapes those control codes if they're not properly terminated.
+
 ## Feature flags
 By default you can only use the current platform's quoting style. That's appropriate most of the time.
 
@@ -139,6 +149,8 @@ println!("{}", Quoted::native(x).force(false));
 The Unix implementation has been [fuzzed](https://github.com/rust-fuzz/cargo-fuzz) against bash, zsh, mksh, ksh93 and busybox to ensure all output is interpreted back as the original string. It has been fuzzed to a more limited extent against fish, dash, tcsh, posh, and yash (which don't support all of the required syntax).
 
 The PowerShell implementation has been fuzzed against PowerShell Core 7.1.4 running on Linux.
+
+Both implementations have been fuzzed to test their protection against Trojan Source attacks.
 
 ## Acknowledgments
 This library is modeled after the quoting done by [Gnulib](https://www.gnu.org/software/gnulib/) as seen in the GNU coreutils. The behavior is not identical, however:
