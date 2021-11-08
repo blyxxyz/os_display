@@ -1,4 +1,4 @@
-## v0.1.2 (unreleased)
+## v0.1.2 (2021-11-08)
 - Escape dangerous control codes for bidirectional text. See also: [CVE-2021-42574](https://blog.rust-lang.org/2021/11/01/cve-2021-42574.html).
 
 ## v0.1.1 (2021-10-14)
