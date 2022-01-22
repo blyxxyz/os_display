@@ -67,12 +67,12 @@ pub(crate) fn write(f: &mut Formatter<'_>, text: &str, force_quote: bool) -> fmt
                 return write_escaped(f, text.as_bytes());
             }
         } else {
-            if !requires_quote && ch.is_whitespace() {
+            if !requires_quote && (ch.is_whitespace() || ch == '\u{2800}') {
                 // yash splits on unicode whitespace.
                 // fish ignores unicode whitespace at the start of a bare string.
                 // Therefore we quote unicode whitespace.
-                // This has benefits for readability, but some blank characters
-                // are not considered whitespace, like U+2800 BRAILLE PATTERN BLANK.
+                // U+2800 BRAILLE PATTERN BLANK is not technically whitespace but we
+                // quote it too.
                 // This check goes stale when new whitespace codepoints are assigned.
                 requires_quote = true;
             }

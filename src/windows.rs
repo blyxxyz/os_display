@@ -315,6 +315,9 @@ mod unicode {
         match ch {
             ' ' | '\t' | '\x0B' | '\x0C' => true,
             '\u{00A0}' | '\u{0085}' => true,
+            // BRAILLE PATTERN BLANK
+            // Not strictly whitespace but invisible enough to quote
+            '\u{2800}' => true,
             c => is_separator(c),
         }
     }
