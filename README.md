@@ -67,7 +67,7 @@ println!("{}: Not found", "*?$".maybe_quote());
 - Unicode may be quoted but only control characters are escaped. The printed text can still look weird, and a few (buggy) terminals drop certain characters.
 - This library should **not** be used to interpolate text into shell scripts. It's designed for readability, not absolute safety. Consider using the [`shell-escape`](https://crates.io/crates/shell-escape) crate instead (or ideally, passing in the values in some other way).
 - The output is not compatible with every single shell.
-- [PowerShell treats quotes differently in arguments to external commands](https://stackoverflow.com/questions/6714165). This library is tuned for arguments to internal commandlets.
+- [PowerShell treats quotes differently in arguments to external commands](https://stackoverflow.com/questions/6714165). This library defaults to quoting for internal commandlets, which may not be what you want. The `Quoted::external()` method toggles this.
 - I'm not a Unicode expert. The first release of this crate had multiple oversights and there may be more.
 
 ## Invalid unicode

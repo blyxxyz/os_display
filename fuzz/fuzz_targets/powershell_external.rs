@@ -11,14 +11,15 @@ mod common;
 
 use common::Shell;
 
-// This code only runs on Linux for various reasons.
-// Grab PowerShell from https://github.com/PowerShell/PowerShell.
+// This test assumes PSNativeCommandArgumentPassing is disabled.
 
-// Set-Variable is used because `$s = ...` sees a bare string as a command.
+// For some reason /usr/bin/printf is ~8 times as fast as printf.
+// This is still 4 times slower than the internal method, but judging
+// by the rates I get from other shells it's probably the maximum
+// possible without parallelism.
 const PWSH_SCRIPT: &str = r#"
 foreach($line in [System.IO.File]::ReadLines("/dev/stdin")) {
-    Invoke-Expression ("Set-Variable s {0}" -f $line)
-    "{0}`0" -f $s
+    Invoke-Expression ("/usr/bin/printf '%s\0\n' {0}" -f $line)
 }
 "#;
 static POWERSHELL: Lazy<Shell> =
@@ -28,21 +29,11 @@ fuzz_target!(|data: &[u8]| {
     // Can't pass null bytes
     let data = data.split(|b| *b == 0).next().unwrap();
 
-    if data.contains(&b'\x1B') {
-        // PowerShell 7.2 strips out certain ANSI command codes, at least
-        // `e^, `e_, and all `e followed by a capital letter.
-        // It doesn't always do this, the invocation in powershell_external.rs
-        // happens to bypass it.
-        // See: https://github.com/PowerShell/PowerShell/issues/16493
-        // We don't treat \x1B/`e very specially. So it's ok to just ignore these.
-        return;
-    }
-
     // PowerShell only speaks UTF-16, so we can't feed it invalid unicode.
     if let Ok(text) = std::str::from_utf8(data) {
-        let quote = Quoted::windows(text).external(false).to_string();
+        let quote = Quoted::windows(text).external(true).to_string();
         let maybe_quote = Quoted::windows(text)
-            .external(false)
+            .external(true)
             .force(false)
             .to_string();
         assert_eq!(POWERSHELL.send(&quote), data, "{:?}", quote);

@@ -48,6 +48,7 @@ jobs:
       - run: cargo +nightly fuzz run bidi -- -max_len=32 -timeout=1 -max_total_time=60
       - run: cargo +nightly fuzz run shell -- -max_len=32 -timeout=1 -max_total_time=180
       - run: cargo +nightly fuzz run powershell -- -max_len=32 -timeout=1 -max_total_time=180
+      - run: cargo +nightly fuzz run powershell_external -- -max_len=32 -timeout=1 -max_total_time=60
 
   lint:
     name: Lint

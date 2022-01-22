@@ -66,6 +66,8 @@ mod windows;
 pub struct Quoted<'a> {
     source: Kind<'a>,
     force_quote: bool,
+    #[cfg(any(feature = "windows", all(feature = "native", windows)))]
+    external: bool,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -89,6 +91,8 @@ impl<'a> Quoted<'a> {
         Quoted {
             source,
             force_quote: true,
+            #[cfg(any(feature = "windows", all(feature = "native", windows)))]
+            external: false,
         }
     }
 
@@ -159,6 +163,36 @@ impl<'a> Quoted<'a> {
         self.force_quote = force;
         self
     }
+
+    /// When quoting for PowerShell, toggle whether to quote for external programs.
+    ///
+    /// If enabled, double quotes (and sometimes backslashes) will be escaped so
+    /// that they can be passed to external programs.
+    ///
+    /// If disabled, quoting will suit internal commandlets and .NET functions.
+    /// Strings that look like options or numbers will be quoted.
+    ///
+    /// It is sadly impossible to quote a string such that it's suitable for both
+    /// external and internal commands.
+    ///
+    /// The experimental `PSNativeCommandArgumentPassing` feature in PowerShell 7.2
+    /// disables the stripping of double quotes and backslashes. If it's enabled
+    /// then this setting should be disabled.
+    ///
+    /// Defaults to `false`. This could change in a future (breaking) release.
+    ///
+    /// # Optional
+    /// This requires either the `windows` or the `native` feature. It has no effect
+    /// on Unix-style quoting.
+    #[cfg(any(feature = "windows", feature = "native"))]
+    #[allow(unused_mut, unused_variables)]
+    pub fn external(mut self, external: bool) -> Self {
+        #[cfg(any(feature = "windows", windows))]
+        {
+            self.external = external;
+        }
+        self
+    }
 }
 
 impl<'a> Display for Quoted<'a> {
@@ -176,8 +210,10 @@ impl<'a> Display for Quoted<'a> {
 
                 #[cfg(windows)]
                 match text.to_str() {
-                    Some(text) => windows::write(f, text, self.force_quote),
-                    None => windows::write_escaped(f, decode_utf16(text.encode_wide())),
+                    Some(text) => windows::write(f, text, self.force_quote, self.external),
+                    None => {
+                        windows::write_escaped(f, decode_utf16(text.encode_wide()), self.external)
+                    }
                 }
                 #[cfg(any(unix, target_os = "wasi"))]
                 match text.to_str() {
@@ -203,7 +239,7 @@ impl<'a> Display for Quoted<'a> {
             },
 
             #[cfg(any(feature = "windows", all(feature = "native", windows)))]
-            Kind::Windows(text) => windows::write(f, text, self.force_quote),
+            Kind::Windows(text) => windows::write(f, text, self.force_quote, self.external),
 
             #[cfg(feature = "windows")]
             #[cfg(feature = "alloc")]
@@ -213,8 +249,10 @@ impl<'a> Display for Quoted<'a> {
             // that we pass straight to write_escaped(), but it seems a bit awkward.
             // Please open an issue if you have a need for this.
             Kind::WindowsRaw(units) => match alloc::string::String::from_utf16(units) {
-                Ok(text) => windows::write(f, &text, self.force_quote),
-                Err(_) => windows::write_escaped(f, decode_utf16(units.iter().cloned())),
+                Ok(text) => windows::write(f, &text, self.force_quote, self.external),
+                Err(_) => {
+                    windows::write_escaped(f, decode_utf16(units.iter().cloned()), self.external)
+                }
             },
         }
     }
@@ -410,13 +448,11 @@ mod tests {
 
     const BOTH_ALWAYS: &[(&str, &str)] = &[
         ("foo", "'foo'"),
-        ("", "''"),
         ("foo/bar.baz", "'foo/bar.baz'"),
         ("can't", r#""can't""#),
     ];
     const BOTH_MAYBE: &[(&str, &str)] = &[
         ("foo", "foo"),
-        ("", "''"),
         ("foo bar", "'foo bar'"),
         ("$foo", "'$foo'"),
         ("-", "-"),
@@ -437,6 +473,7 @@ mod tests {
     ];
 
     const UNIX_ALWAYS: &[(&str, &str)] = &[
+        ("", "''"),
         (r#"can'"t"#, r#"'can'\''"t'"#),
         (r#"can'$t"#, r#"'can'\''$t'"#),
         ("foo\nb\ta\r\\\0`r", r#"$'foo\nb\ta\r\\\x00`r'"#),
@@ -444,6 +481,7 @@ mod tests {
         (r#"'$''"#, r#"\''$'\'\'"#),
     ];
     const UNIX_MAYBE: &[(&str, &str)] = &[
+        ("", "''"),
         ("-x", "-x"),
         ("a,b", "a,b"),
         ("a\\b", "'a\\b'"),
@@ -495,12 +533,13 @@ mod tests {
         (r#"'$''"#, r#"'''$'''''"#),
     ];
     const WINDOWS_MAYBE: &[(&str, &str)] = &[
-        ("-x", "'-x'"),
+        ("--%", "'--%'"),
+        ("--ok", "--ok"),
         ("—x", "'—x'"),
         ("a,b", "'a,b'"),
         ("a\\b", "a\\b"),
         ("‘", r#""‘""#),
-        ("‘\"", r#"''‘"'"#),
+        (r#"‘""#, r#"''‘"'"#),
         ("„\0", r#""`„`0""#),
         ("\t", r#""`t""#),
         ("\r", r#""`r""#),
@@ -512,6 +551,30 @@ mod tests {
         ),
     ];
     const WINDOWS_RAW: &[(&[u16], &str)] = &[(&[b'x' as u16, 0xD800], r#""x`u{D800}""#)];
+    const WINDOWS_EXTERNAL: &[(&str, &str)] = &[
+        ("", r#"'""'"#),
+        (r#"\""#, r#"'\\\"'"#),
+        (r#"\\""#, r#"'\\\\\"'"#),
+        (r#"\x\""#, r#"'\x\\\"'"#),
+        (r#"\x\"'""#, r#"'\x\\\"''\"'"#),
+        ("\n\\\"", r#""`n\\\`"""#),
+        ("\n\\\\\"", r#""`n\\\\\`"""#),
+        ("\n\\x\\\"", r#""`n\x\\\`"""#),
+        ("\n\\x\\\"'\"", r#""`n\x\\\`"'\`"""#),
+        ("-x:", "'-x:'"),
+        ("-x.x", "'-x.x'"),
+        ("--%", r#"'"--%"'"#),
+        ("--ok", "--ok"),
+    ];
+    const WINDOWS_INTERNAL: &[(&str, &str)] = &[
+        ("", "''"),
+        (r#"can'"t"#, r#"'can''"t'"#),
+        ("-x", "'-x'"),
+        ("—x", "'—x'"),
+        ("‘\"", r#"''‘"'"#),
+        ("--%", "'--%'"),
+        ("--ok", "--ok"),
+    ];
 
     #[cfg(feature = "windows")]
     #[test]
@@ -524,6 +587,24 @@ mod tests {
         }
         for &(orig, expected) in WINDOWS_RAW {
             assert_eq!(Quoted::windows_raw(orig).to_string(), expected);
+        }
+        for &(orig, expected) in WINDOWS_EXTERNAL {
+            assert_eq!(
+                Quoted::windows(orig)
+                    .force(false)
+                    .external(true)
+                    .to_string(),
+                expected
+            );
+        }
+        for &(orig, expected) in WINDOWS_INTERNAL {
+            assert_eq!(
+                Quoted::windows(orig)
+                    .force(false)
+                    .external(false)
+                    .to_string(),
+                expected
+            );
         }
         let bidi_ok = nest_bidi(16);
         assert_eq!(

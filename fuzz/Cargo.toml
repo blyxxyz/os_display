@@ -41,6 +41,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "powershell_external"
+path = "fuzz_targets/powershell_external.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "bidi"
 path = "fuzz_targets/bidi.rs"
 test = false
