@@ -26,8 +26,10 @@
 //! use os_display::Quoted;
 //!
 //! // "foo`nbar"
+//! # #[cfg(feature = "windows")]
 //! println!("{}", Quoted::windows("foo\nbar"));
 //! // $'foo\nbar'
+//! # #[cfg(feature = "unix")]
 //! println!("{}", Quoted::unix("foo\nbar"));
 //! ```
 
