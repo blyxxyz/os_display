@@ -3,7 +3,7 @@
 [![Crates.io](https://img.shields.io/crates/v/os_display.svg)](https://crates.io/crates/os_display)
 [![API reference](https://docs.rs/os_display/badge.svg)](https://docs.rs/os_display/)
 [![MSRV](https://img.shields.io/badge/MSRV-1.31-blue)](https://blog.rust-lang.org/2018/12/06/Rust-1.31-and-rust-2018.html)
-[![CI](https://img.shields.io/github/workflow/status/blyxxyz/os_display/CI/master)](https://github.com/blyxxyz/os_display/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/blyxxyz/os_display/ci.yaml?branch=master)](https://github.com/blyxxyz/os_display/actions)
 
 Printing strings can be tricky. They may contain control codes that mess up the message or the whole terminal. On Unix even filenames can contain characters like that.
 
