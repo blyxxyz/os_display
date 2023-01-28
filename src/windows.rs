@@ -82,7 +82,7 @@ pub(crate) fn write(
             // Unlike in Unix, quoting an argument may stop it
             // from being recognized as an option. I like that very much.
             if !requires_quote && unicode::is_dash(first) {
-                if second == None || second == Some('-') {
+                if second.is_none() || second == Some('-') {
                     // "-" is a common special argument we don't want to quote.
                     // Something with multiple leading dashes won't be recognized
                     // as an option. (Except for --% sorta.)
