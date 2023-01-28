@@ -11,13 +11,12 @@ mod common;
 
 use common::Shell;
 
-// This test assumes PSNativeCommandArgumentPassing is disabled.
-
 // For some reason /usr/bin/printf is ~8 times as fast as printf.
 // This is still 4 times slower than the internal method, but judging
 // by the rates I get from other shells it's probably the maximum
 // possible without parallelism.
 const PWSH_SCRIPT: &str = r#"
+$PSNativeCommandArgumentPassing = 'Legacy'
 foreach($line in [System.IO.File]::ReadLines("/dev/stdin")) {
     Invoke-Expression ("/usr/bin/printf '%s\0\n' {0}" -f $line)
 }
