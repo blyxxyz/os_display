@@ -38,8 +38,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: sudo apt-get update
-      - run: sudo apt-get install -y bash zsh ksh mksh busybox dash posh yash fish tcsh curl liblttng-ust0
-      - run: curl -L -o powershell.deb https://github.com/PowerShell/PowerShell/releases/download/v7.1.4/powershell_7.1.4-1.ubuntu.20.04_amd64.deb
+      # PowerShell dependencies: libicu70
+      - run: sudo apt-get install -y bash zsh ksh mksh busybox dash posh yash fish tcsh curl libicu70
+      - run: curl -L -o powershell.deb https://github.com/PowerShell/PowerShell/releases/download/v7.3.2/powershell_7.3.2-1.deb_amd64.deb
       - run: sudo dpkg -i powershell.deb
       - run: rustup toolchain add nightly
       - run: cargo install cargo-fuzz
