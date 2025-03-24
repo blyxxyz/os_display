@@ -478,6 +478,7 @@ mod tests {
         (r#"can'"t"#, r#"'can'\''"t'"#),
         (r#"can'$t"#, r#"'can'\''$t'"#),
         ("foo\nb\ta\r\\\0`r", r#"$'foo\nb\ta\r\\\x00`r'"#),
+        ("trailing newline\n", r#"$'trailing newline\n'"#),
         ("foo\x02", r#"$'foo\x02'"#),
         (r#"'$''"#, r#"\''$'\'\'"#),
     ];
