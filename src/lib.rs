@@ -39,6 +39,9 @@
 
 use core::fmt::{self, Display, Formatter};
 
+#[cfg(not(any(feature = "unix", feature = "windows", feature = "native")))]
+compile_error!("At least one of features 'unix', 'windows', 'native' must be enabled");
+
 #[cfg(feature = "std")]
 extern crate std;
 
