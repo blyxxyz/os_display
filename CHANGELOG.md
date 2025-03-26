@@ -1,3 +1,6 @@
+## v0.1.4 (unreleased)
+- Update `unicode-width` to 0.2.0 for a likely size reduction.
+
 ## v0.1.3 (2021-01-22)
 - Add `Quoted::external()` to escape double quotes for native commands on Windows.
 - Quote `U+2800 BRAILLE PATTERN BLANK` for clarity.

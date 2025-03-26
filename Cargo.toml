@@ -13,7 +13,7 @@ edition = "2018"
 exclude = ["fuzz", ".gitignore", ".github", "scripts"]
 
 [dependencies]
-unicode-width = "0.2.0"
+unicode-width = { version = "0.2.0", default-features = false }
 
 [features]
 default = ["native", "alloc", "std"]
