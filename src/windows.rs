@@ -18,7 +18,7 @@ const SPECIAL_SHELL_CHARS: &[u8] = b"|&;<>()$`\"'*?[]=,{} ";
 /// expanding if passed to an external program, but not if passed to Get-ChildItem.
 const SPECIAL_SHELL_CHARS_START: &[char] = &['~', '#', '@', '!'];
 
-const DOUBLE_UNSAFE: &[u8] = &[b'"', b'`', b'$'];
+const DOUBLE_UNSAFE: &[u8] = b"\"`$";
 
 pub(crate) fn write(
     f: &mut Formatter<'_>,
@@ -331,36 +331,42 @@ mod unicode {
     ///
     /// Unicode 15.0 will release on September 11, 2022.
     fn is_separator(ch: char) -> bool {
-        match ch {
-            '\u{0020}' | '\u{00A0}' | '\u{1680}' | '\u{2000}' | '\u{2001}' | '\u{2002}'
-            | '\u{2003}' | '\u{2004}' | '\u{2005}' | '\u{2006}' | '\u{2007}' | '\u{2008}'
-            | '\u{2009}' | '\u{200A}' | '\u{2028}' | '\u{2029}' | '\u{202F}' | '\u{205F}'
-            | '\u{3000}' => true,
-            _ => false,
-        }
+        matches!(
+            ch,
+            '\u{0020}'
+                | '\u{00A0}'
+                | '\u{1680}'
+                | '\u{2000}'
+                | '\u{2001}'
+                | '\u{2002}'
+                | '\u{2003}'
+                | '\u{2004}'
+                | '\u{2005}'
+                | '\u{2006}'
+                | '\u{2007}'
+                | '\u{2008}'
+                | '\u{2009}'
+                | '\u{200A}'
+                | '\u{2028}'
+                | '\u{2029}'
+                | '\u{202F}'
+                | '\u{205F}'
+                | '\u{3000}'
+        )
     }
 
     /// These can be used to start options.
     ///
     /// There exist others, but PowerShell doesn't care about them.
     pub(crate) fn is_dash(ch: char) -> bool {
-        match ch {
-            '-' | '\u{2013}' | '\u{2014}' | '\u{2015}' => true,
-            _ => false,
-        }
+        matches!(ch, '-' | '\u{2013}' | '\u{2014}' | '\u{2015}')
     }
 
     pub(crate) fn is_single_quote(ch: char) -> bool {
-        match ch {
-            '\'' | '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}' => true,
-            _ => false,
-        }
+        matches!(ch, '\'' | '\u{2018}' | '\u{2019}' | '\u{201A}' | '\u{201B}')
     }
 
     pub(crate) fn is_double_quote(ch: char) -> bool {
-        match ch {
-            '"' | '\u{201C}' | '\u{201D}' | '\u{201E}' => true,
-            _ => false,
-        }
+        matches!(ch, '"' | '\u{201C}' | '\u{201D}' | '\u{201E}')
     }
 }

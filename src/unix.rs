@@ -17,7 +17,7 @@ const SPECIAL_SHELL_CHARS: &[u8] = b"|&;<>()$`\\\"'*?[]=^{} ";
 const SPECIAL_SHELL_CHARS_START: &[char] = &['~', '#', '!'];
 
 /// Characters that are interpreted specially in a double-quoted string.
-const DOUBLE_UNSAFE: &[u8] = &[b'"', b'`', b'$', b'\\'];
+const DOUBLE_UNSAFE: &[u8] = b"\"`$\\";
 
 pub(crate) fn write(f: &mut Formatter<'_>, text: &str, force_quote: bool) -> fmt::Result {
     let mut is_single_safe = true;

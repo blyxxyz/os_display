@@ -188,7 +188,7 @@ impl<'a> Quoted<'a> {
     }
 }
 
-impl<'a> Display for Quoted<'a> {
+impl Display for Quoted<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.source {
             #[cfg(feature = "native")]
@@ -275,10 +275,7 @@ fn is_separator(ch: char) -> bool {
 /// LEFT-TO-RIGHT EMBEDDING..RIGHT-TO-LEFT OVERRIDE
 /// LEFT-TO-RIGHT ISOLATE..POP DIRECTIONAL ISOLATE
 fn is_bidi(ch: char) -> bool {
-    match ch {
-        '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}' => true,
-        _ => false,
-    }
+    matches!(ch, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')
 }
 
 /// Check whether text uses bidi in a potentially problematic way.
