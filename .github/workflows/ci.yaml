@@ -14,10 +14,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
-      - run: rustup toolchain add 1.31 1.36 stable nightly
+      - run: rustup toolchain add 1.66 stable nightly
       - run: scripts/check_matrix.sh
-      - run: cargo +1.31 test --all-features
-      - run: cargo +1.36 test --all-features
+      - run: cargo +1.66 test --all-features
       - run: cargo +stable test --all-features
       - run: cargo +nightly test --all-features
 
@@ -26,9 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: rustup toolchain add 1.31 1.36
-      - run: rustup target add wasm32-unknown-unknown --toolchain 1.31
-      - run: rustup target add wasm32-unknown-unknown --toolchain 1.36
+      - run: rustup toolchain add 1.66
+      - run: rustup target add wasm32-unknown-unknown --toolchain 1.66
       - run: scripts/check_matrix.sh --target wasm32-unknown-unknown
       - run: node scripts/test_wasm.js
 

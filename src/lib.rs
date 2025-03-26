@@ -42,15 +42,8 @@ use core::fmt::{self, Display, Formatter};
 #[cfg(feature = "std")]
 extern crate std;
 
-// alloc was unstable in 1.31, so do some shuffling to avoid it unless necessary.
-// 1.31 works with no features and with all features.
-// 1.36 is the minimum version that supports alloc without std.
-#[cfg(all(feature = "alloc", not(feature = "std")))]
+#[cfg(feature = "alloc")]
 extern crate alloc;
-
-#[cfg(feature = "windows")]
-#[cfg(feature = "std")]
-use std as alloc;
 
 #[cfg(feature = "native")]
 #[cfg(feature = "std")]

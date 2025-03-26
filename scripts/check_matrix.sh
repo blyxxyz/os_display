@@ -9,30 +9,25 @@
 set -e
 set -v
 
-cargo +1.31 check --no-default-features --features native "$@"
-cargo +1.36 check --no-default-features --features native,alloc "$@"
-cargo +1.31 check --no-default-features --features native,std "$@"
+# 1.68 really should be 1.66 but that one can't handle modern cargo registries
 
-cargo +1.31 check --no-default-features --features unix "$@"
-cargo +1.36 check --no-default-features --features unix,alloc "$@"
-cargo +1.31 check --no-default-features --features unix,std "$@"
+cargo +1.68 check --no-default-features --features native "$@"
+cargo +1.68 check --no-default-features --features native,std "$@"
 
-cargo +1.31 check --no-default-features --features windows "$@"
-cargo +1.36 check --no-default-features --features windows,alloc "$@"
-cargo +1.31 check --no-default-features --features windows,std "$@"
+cargo +1.68 check --no-default-features --features unix "$@"
+cargo +1.68 check --no-default-features --features unix,std "$@"
 
-cargo +1.31 check --no-default-features --features native,unix "$@"
-cargo +1.36 check --no-default-features --features native,unix,alloc "$@"
-cargo +1.31 check --no-default-features --features native,unix,std "$@"
+cargo +1.68 check --no-default-features --features windows "$@"
+cargo +1.68 check --no-default-features --features windows,std "$@"
 
-cargo +1.31 check --no-default-features --features native,windows "$@"
-cargo +1.36 check --no-default-features --features native,windows,alloc "$@"
-cargo +1.31 check --no-default-features --features native,windows,std "$@"
+cargo +1.68 check --no-default-features --features native,unix "$@"
+cargo +1.68 check --no-default-features --features native,unix,std "$@"
 
-cargo +1.31 check --no-default-features --features unix,windows "$@"
-cargo +1.36 check --no-default-features --features unix,windows,alloc "$@"
-cargo +1.31 check --no-default-features --features unix,windows,std "$@"
+cargo +1.68 check --no-default-features --features native,windows "$@"
+cargo +1.68 check --no-default-features --features native,windows,std "$@"
 
-cargo +1.31 check --no-default-features --features native,unix,windows "$@"
-cargo +1.36 check --no-default-features --features native,unix,windows,alloc "$@"
-cargo +1.31 check --no-default-features --features native,unix,windows,std "$@"
+cargo +1.68 check --no-default-features --features unix,windows "$@"
+cargo +1.68 check --no-default-features --features unix,windows,std "$@"
+
+cargo +1.68 check --no-default-features --features native,unix,windows "$@"
+cargo +1.68 check --no-default-features --features native,unix,windows,std "$@"
