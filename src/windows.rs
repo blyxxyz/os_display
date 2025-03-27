@@ -329,7 +329,7 @@ mod unicode {
     /// curl -s https://www.unicode.org/Public/UCD/latest/ucd/UnicodeData.txt \
     ///     | grep -e Zl -e Zp -e Zs | cut -d ';' -f 1
     ///
-    /// Unicode 15.0 will release on September 11, 2022.
+    /// Up to date as of Unicode 16.0.
     fn is_separator(ch: char) -> bool {
         matches!(
             ch,

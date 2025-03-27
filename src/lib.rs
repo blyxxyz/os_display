@@ -160,22 +160,21 @@ impl<'a> Quoted<'a> {
         self
     }
 
-    /// When quoting for PowerShell, toggle whether to quote for external programs.
+    /// When quoting for PowerShell, toggle whether to use legacy quoting for external
+    /// programs.
     ///
     /// If enabled, double quotes (and sometimes backslashes) will be escaped so
-    /// that they can be passed to external programs.
+    /// that they can be passed to external programs in PowerShell versions before
+    /// 7.3, or with `$PSNativeCommandArgumentPassing` set to `'Legacy'`.
     ///
-    /// If disabled, quoting will suit internal commandlets and .NET functions.
-    /// Strings that look like options or numbers will be quoted.
+    /// If disabled, quoting will suit modern argument passing (always used for internal
+    /// commandlets and .NET functions). Strings that look like options or numbers will
+    /// be quoted.
     ///
     /// It is sadly impossible to quote a string such that it's suitable for both
-    /// external and internal commands.
+    /// modern and legacy argument passing.
     ///
-    /// The experimental `PSNativeCommandArgumentPassing` feature in PowerShell 7.2
-    /// disables the stripping of double quotes and backslashes. If it's enabled
-    /// then this setting should be disabled.
-    ///
-    /// Defaults to `false`. This could change in a future (breaking) release.
+    /// Defaults to `false`.
     ///
     /// # Optional
     /// This requires either the `windows` or the `native` feature. It has no effect
