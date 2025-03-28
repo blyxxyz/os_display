@@ -15,20 +15,22 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: rustup toolchain add 1.66 stable nightly
-      - run: scripts/check_matrix.sh
-      - run: cargo +1.66 test --all-features
-      - run: cargo +stable test --all-features
-      - run: cargo +nightly test --all-features
+      - run: scripts/check_matrix.sh +1.66
+      - run: scripts/check_matrix.sh +stable
+      - run: scripts/check_matrix.sh +nightly
+      - run: scripts/test_matrix.sh +1.66
+      - run: scripts/test_matrix.sh +stable
+      - run: scripts/test_matrix.sh +nightly
 
-  test_wasm:
-    name: Test (WASM)
+  test_wasi:
+    name: Test (WASI)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: rustup toolchain add 1.66
-      - run: rustup target add wasm32-unknown-unknown --toolchain 1.66
-      - run: scripts/check_matrix.sh --target wasm32-unknown-unknown
-      - run: node scripts/test_wasm.js
+      - run: scripts/setup_wasmtime.sh
+      - run: rustup target add wasm32-wasip2
+      - run: scripts/check_matrix.sh --target wasm32-wasip2
+      - run: scripts/test_matrix.sh --target wasm32-wasip2
 
   fuzz:
     name: Fuzz
@@ -54,7 +56,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - run: rustup target add x86_64-pc-windows-msvc wasm32-wasi wasm32-unknown-unknown
+      - run: rustup target add x86_64-pc-windows-msvc wasm32-wasip2 wasm32-unknown-unknown
 
       - name: rustfmt
         run: cargo fmt -- --check
@@ -66,7 +68,4 @@ jobs:
         run: cargo clippy --target x86_64-pc-windows-msvc -- -D warnings
 
       - name: clippy (WASI)
-        run: cargo clippy --target wasm32-wasi -- -D warnings
-
-      - name: clippy (WASM)
-        run: cargo clippy --target wasm32-unknown-unknown -- -D warnings
+        run: cargo clippy --target wasm32-wasip2 -- -D warnings
