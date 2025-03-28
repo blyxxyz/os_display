@@ -1,6 +1,6 @@
 [package]
 name = "os_display"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Jan Verbeek <jan.verbeek@posteo.nl>"]
 description = "Display strings in a safe platform-appropriate way"
 keywords = ["shell", "cli", "terminal", "text", "no_std"]
