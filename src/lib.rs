@@ -106,7 +106,7 @@ impl<'a> Quoted<'a> {
 
     /// Quote an `OsStr` with the default style for the platform.
     ///
-    /// On platforms other than Windows, Unix and WASI, if the encoding is
+    /// On platforms other than Windows and Unix, if the encoding is
     /// invalid, the `Debug` representation will be used.
     #[cfg(feature = "native")]
     #[cfg(feature = "std")]
@@ -198,8 +198,6 @@ impl Display for Quoted<'_> {
             Kind::NativeRaw(text) => {
                 #[cfg(unix)]
                 use std::os::unix::ffi::OsStrExt;
-                #[cfg(target_os = "wasi")]
-                use std::os::wasi::ffi::OsStrExt;
                 #[cfg(windows)]
                 use std::os::windows::ffi::OsStrExt;
 
@@ -210,12 +208,12 @@ impl Display for Quoted<'_> {
                         windows::write_escaped(f, decode_utf16(text.encode_wide()), self.external)
                     }
                 }
-                #[cfg(any(unix, target_os = "wasi"))]
+                #[cfg(unix)]
                 match text.to_str() {
                     Some(text) => unix::write(f, text, self.force_quote),
                     None => unix::write_escaped(f, text.as_bytes()),
                 }
-                #[cfg(not(any(windows, unix, target_os = "wasi")))]
+                #[cfg(not(any(windows, unix)))]
                 match text.to_str() {
                     Some(text) => unix::write(f, text, self.force_quote),
                     // Debug is our best shot for not losing information.
@@ -627,13 +625,11 @@ mod tests {
     }
 
     #[cfg(feature = "native")]
-    #[cfg(any(unix, target_os = "wasi"))]
+    #[cfg(unix)]
     #[test]
     fn native() {
         #[cfg(unix)]
         use std::os::unix::ffi::OsStrExt;
-        #[cfg(target_os = "wasi")]
-        use std::os::wasi::ffi::OsStrExt;
 
         assert_eq!("'\"".quote().to_string(), r#"\''"'"#);
         assert_eq!("x\0".quote().to_string(), r#"$'x\x00'"#);
@@ -644,7 +640,7 @@ mod tests {
     }
 
     #[cfg(feature = "native")]
-    #[cfg(not(any(windows, unix, target_os = "wasi")))]
+    #[cfg(not(any(windows, unix)))]
     #[test]
     fn native() {
         assert_eq!("'\"".quote().to_string(), r#"\''"'"#);
