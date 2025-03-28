@@ -39,18 +39,14 @@
 
 use core::fmt::{self, Display, Formatter};
 
+#[cfg(not(any(feature = "unix", feature = "windows", feature = "native")))]
+compile_error!("At least one of features 'unix', 'windows', 'native' must be enabled");
+
 #[cfg(feature = "std")]
 extern crate std;
 
-// alloc was unstable in 1.31, so do some shuffling to avoid it unless necessary.
-// 1.31 works with no features and with all features.
-// 1.36 is the minimum version that supports alloc without std.
-#[cfg(all(feature = "alloc", not(feature = "std")))]
+#[cfg(feature = "alloc")]
 extern crate alloc;
-
-#[cfg(feature = "windows")]
-#[cfg(feature = "std")]
-use std as alloc;
 
 #[cfg(feature = "native")]
 #[cfg(feature = "std")]
@@ -110,7 +106,7 @@ impl<'a> Quoted<'a> {
 
     /// Quote an `OsStr` with the default style for the platform.
     ///
-    /// On platforms other than Windows, Unix and WASI, if the encoding is
+    /// On platforms other than Windows and Unix, if the encoding is
     /// invalid, the `Debug` representation will be used.
     #[cfg(feature = "native")]
     #[cfg(feature = "std")]
@@ -164,22 +160,21 @@ impl<'a> Quoted<'a> {
         self
     }
 
-    /// When quoting for PowerShell, toggle whether to quote for external programs.
+    /// When quoting for PowerShell, toggle whether to use legacy quoting for external
+    /// programs.
     ///
     /// If enabled, double quotes (and sometimes backslashes) will be escaped so
-    /// that they can be passed to external programs.
+    /// that they can be passed to external programs in PowerShell versions before
+    /// 7.3, or with `$PSNativeCommandArgumentPassing` set to `'Legacy'`.
     ///
-    /// If disabled, quoting will suit internal commandlets and .NET functions.
-    /// Strings that look like options or numbers will be quoted.
+    /// If disabled, quoting will suit modern argument passing (always used for internal
+    /// commandlets and .NET functions). Strings that look like options or numbers will
+    /// be quoted.
     ///
     /// It is sadly impossible to quote a string such that it's suitable for both
-    /// external and internal commands.
+    /// modern and legacy argument passing.
     ///
-    /// The experimental `PSNativeCommandArgumentPassing` feature in PowerShell 7.2
-    /// disables the stripping of double quotes and backslashes. If it's enabled
-    /// then this setting should be disabled.
-    ///
-    /// Defaults to `false`. This could change in a future (breaking) release.
+    /// Defaults to `false`.
     ///
     /// # Optional
     /// This requires either the `windows` or the `native` feature. It has no effect
@@ -195,7 +190,7 @@ impl<'a> Quoted<'a> {
     }
 }
 
-impl<'a> Display for Quoted<'a> {
+impl Display for Quoted<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.source {
             #[cfg(feature = "native")]
@@ -203,8 +198,6 @@ impl<'a> Display for Quoted<'a> {
             Kind::NativeRaw(text) => {
                 #[cfg(unix)]
                 use std::os::unix::ffi::OsStrExt;
-                #[cfg(target_os = "wasi")]
-                use std::os::wasi::ffi::OsStrExt;
                 #[cfg(windows)]
                 use std::os::windows::ffi::OsStrExt;
 
@@ -215,12 +208,12 @@ impl<'a> Display for Quoted<'a> {
                         windows::write_escaped(f, decode_utf16(text.encode_wide()), self.external)
                     }
                 }
-                #[cfg(any(unix, target_os = "wasi"))]
+                #[cfg(unix)]
                 match text.to_str() {
                     Some(text) => unix::write(f, text, self.force_quote),
                     None => unix::write_escaped(f, text.as_bytes()),
                 }
-                #[cfg(not(any(windows, unix, target_os = "wasi")))]
+                #[cfg(not(any(windows, unix)))]
                 match text.to_str() {
                     Some(text) => unix::write(f, text, self.force_quote),
                     // Debug is our best shot for not losing information.
@@ -282,10 +275,7 @@ fn is_separator(ch: char) -> bool {
 /// LEFT-TO-RIGHT EMBEDDING..RIGHT-TO-LEFT OVERRIDE
 /// LEFT-TO-RIGHT ISOLATE..POP DIRECTIONAL ISOLATE
 fn is_bidi(ch: char) -> bool {
-    match ch {
-        '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}' => true,
-        _ => false,
-    }
+    matches!(ch, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')
 }
 
 /// Check whether text uses bidi in a potentially problematic way.
@@ -478,6 +468,7 @@ mod tests {
         (r#"can'"t"#, r#"'can'\''"t'"#),
         (r#"can'$t"#, r#"'can'\''$t'"#),
         ("foo\nb\ta\r\\\0`r", r#"$'foo\nb\ta\r\\\x00`r'"#),
+        ("trailing newline\n", r#"$'trailing newline\n'"#),
         ("foo\x02", r#"$'foo\x02'"#),
         (r#"'$''"#, r#"\''$'\'\'"#),
     ];
@@ -634,13 +625,11 @@ mod tests {
     }
 
     #[cfg(feature = "native")]
-    #[cfg(any(unix, target_os = "wasi"))]
+    #[cfg(unix)]
     #[test]
     fn native() {
         #[cfg(unix)]
         use std::os::unix::ffi::OsStrExt;
-        #[cfg(target_os = "wasi")]
-        use std::os::wasi::ffi::OsStrExt;
 
         assert_eq!("'\"".quote().to_string(), r#"\''"'"#);
         assert_eq!("x\0".quote().to_string(), r#"$'x\x00'"#);
@@ -651,7 +640,7 @@ mod tests {
     }
 
     #[cfg(feature = "native")]
-    #[cfg(not(any(windows, unix, target_os = "wasi")))]
+    #[cfg(not(any(windows, unix)))]
     #[test]
     fn native() {
         assert_eq!("'\"".quote().to_string(), r#"\''"'"#);

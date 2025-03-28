@@ -9,11 +9,12 @@ repository = "https://github.com/blyxxyz/os_display"
 documentation = "https://docs.rs/os_display"
 license = "MIT"
 readme = "README.md"
-edition = "2018"
+edition = "2021"
+rust-version = "1.66"
 exclude = ["fuzz", ".gitignore", ".github", "scripts"]
 
 [dependencies]
-unicode-width = "0.1.9"
+unicode-width = { version = "0.2.0", default-features = false }
 
 [features]
 default = ["native", "alloc", "std"]

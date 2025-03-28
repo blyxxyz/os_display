@@ -2,31 +2,45 @@
 
 [![Crates.io](https://img.shields.io/crates/v/os_display.svg)](https://crates.io/crates/os_display)
 [![API reference](https://docs.rs/os_display/badge.svg)](https://docs.rs/os_display/)
-[![MSRV](https://img.shields.io/badge/MSRV-1.31-blue)](https://blog.rust-lang.org/2018/12/06/Rust-1.31-and-rust-2018.html)
+[![MSRV](https://img.shields.io/badge/MSRV-1.66-blue)](https://blog.rust-lang.org/2022/12/15/Rust-1.66.0.html)
 [![CI](https://img.shields.io/github/actions/workflow/status/blyxxyz/os_display/ci.yaml?branch=master)](https://github.com/blyxxyz/os_display/actions)
 
-Printing strings can be tricky. They may contain control codes that mess up the message or the whole terminal. On Unix even filenames can contain characters like that.
+This crate quotes strings so that they can be copy/pasted in the terminal.
 
-Filenames may also contain invalid unicode, which is not preserved by [`Path::display`](https://doc.rust-lang.org/std/path/struct.Path.html#method.display).
+```
+use os_display::Quotable;
 
-Finally, they can contain special characters that aren't safe to use in a command without quoting or escaping.
+"filename".quote() → 'filename'
+"foo'bar".quote() → "foo'bar"
+"foo\u{1B}".quote() → $'foo\x1B'
+"ihavenospaces".maybe_quote() → ihavenospaces
+"i do have spaces".maybe_quote() → 'i do have spaces'
+```
 
-This library lets you add quoting to filenames (and other strings) to display them more safely and usefully. The goal is to render them in such a way that they can be copied and pasted back into a shell without information loss.
+This deals with a number of problems:
+
+- Strings can have control codes that mess up the message or the whole terminal.
+
+- Whitespace and special characters must be quoted or escaped to be used in a shell command.
+
+- `OsString`s and `Path`s can contain invalid Unicode (which even [`Path::display`](https://doc.rust-lang.org/std/path/struct.Path.html#method.display) doesn't preserve). This crate handles them as appropriate for the platform.
+
+Values are rendered so that they can always be pasted back into a shell without information loss.
 
 On Unix (and other platforms) values are quoted using bash/ksh syntax, while on Windows PowerShell syntax is used.
 
 ## When should I use this?
 
-This library is best suited for command line programs that deal with arbitrary filenames or other "dirty" text. `mv` for example is the very tool you use to rename files with problematic names, so it's nice if its messages handle them well.
+This crate is especially useful for command line programs that deal with arbitrary filenames or other "dirty" text. `ls` for example is the very tool you use to find odd filenames, so it's nice if it displays them well. This is why it's used in [`uutils`](https://github.com/uutils/coreutils).
 
-Programs that aren't expected to deal with weird data don't get as much benefit.
+Another use case is printing commands for the user to run. [`xh`](https://github.com/ducaale/xh) has a mode that prints `curl` commands, using this crate to make them pretty and copy/pastable on both Unix and Windows.
 
-The output is made for shells, so displaying it in e.g. a GUI may not make sense.
+Any program that prints text that the user might want to paste into a terminal can get some use out of this.
 
-Most programs get along fine without this. You likely don't strictly need it, but you may find it a nice improvement.
+Most programs get along fine without it. You likely don't strictly need it, but you may find it a nice improvement.
 
 ## Usage
-Import the `Quotable` trait:
+Import the [`Quotable`](https://docs.rs/os_display/latest/os_display/trait.Quotable.html) trait:
 
 ```rust
 use os_display::Quotable;
@@ -61,13 +75,13 @@ println!("{}: Not found", "foo bar".maybe_quote());
 println!("{}: Not found", "*?$".maybe_quote());
 ```
 
-`.quote()` is best used inside longer sentences while `.maybe_quote()` can be used for text that's already separated some other way (like by a colon).
+`.quote()` is best used inside longer sentences while `.maybe_quote()` can be used for text that's already separated some other way, like by a colon. This is the convention of many GNU programs.
 
 ## Limitations
 - Unicode may be quoted but only control characters are escaped. The printed text can still look weird, and a few (buggy) terminals drop certain characters.
 - This library should **not** be used to interpolate text into shell scripts. It's designed for readability, not absolute safety. Consider using the [`shell-escape`](https://crates.io/crates/shell-escape) crate instead (or ideally, passing in the values in some other way).
 - The output is not compatible with every single shell.
-- [PowerShell treats quotes differently in arguments to external commands](https://stackoverflow.com/questions/6714165). This library defaults to quoting for internal commandlets, which may not be what you want. The `Quoted::external()` method toggles this.
+- [Old versions of PowerShell treat quotes differently in arguments to external commands](https://stackoverflow.com/questions/6714165). This library defaults to the modern behavior. The `Quoted::external()` method toggles legacy quoting.
 - I'm not a Unicode expert. The first release of this crate had multiple oversights and there may be more.
 
 ## Invalid unicode
